@@ -81,3 +81,61 @@ def rolling_z(s: pd.Series, window: int) -> pd.Series:
     mu = s.rolling(window, min_periods=window).mean()
     sd = s.rolling(window, min_periods=window).std(ddof=0)
     return (s - mu) / sd.replace(0, np.nan)
+
+
+def realized_vol(returns: pd.Series, window: int) -> pd.Series:
+    """Rolling standard deviation of returns — realized volatility proxy."""
+    return returns.rolling(window, min_periods=window).std(ddof=0)
+
+
+def drawdown_from_high(close: pd.Series, window: int) -> pd.Series:
+    """How far below the rolling N-bar high (always <= 0)."""
+    high = close.rolling(window, min_periods=window).max()
+    return (close - high) / high
+
+
+def runup_from_low(close: pd.Series, window: int) -> pd.Series:
+    """How far above the rolling N-bar low (always >= 0)."""
+    low = close.rolling(window, min_periods=window).min()
+    return (close - low) / low.replace(0, np.nan)
+
+
+def position_in_range(high: pd.Series, low: pd.Series, close: pd.Series) -> pd.Series:
+    """Where close sits within the bar's high-low range: 0 = at low, 1 = at high."""
+    span = (high - low).replace(0, np.nan)
+    return (close - low) / span
+
+
+def intraday_range_pct(high: pd.Series, low: pd.Series, close: pd.Series) -> pd.Series:
+    """Bar range as a percentage of close — intraday volatility proxy."""
+    return (high - low) / close.replace(0, np.nan)
+
+
+def distance_from_ma(close: pd.Series, window: int) -> pd.Series:
+    """Percent distance from the rolling mean — positive when above."""
+    ma = close.rolling(window, min_periods=window).mean()
+    return (close - ma) / ma.replace(0, np.nan)
+
+
+def rolling_skew(returns: pd.Series, window: int) -> pd.Series:
+    return returns.rolling(window, min_periods=window).skew()
+
+
+def rolling_kurtosis(returns: pd.Series, window: int) -> pd.Series:
+    return returns.rolling(window, min_periods=window).kurt()
+
+
+def rolling_beta(returns: pd.Series, market_returns: pd.Series, window: int) -> pd.Series:
+    """Rolling beta of returns to market_returns over `window` bars."""
+    mkt = market_returns.reindex(returns.index)
+    cov = returns.rolling(window, min_periods=window).cov(mkt)
+    var = mkt.rolling(window, min_periods=window).var(ddof=0)
+    return cov / var.replace(0, np.nan)
+
+
+def relative_strength(returns: pd.Series, market_returns: pd.Series, window: int) -> pd.Series:
+    """Cumulative log-return of asset minus market over the trailing `window` bars."""
+    mkt = market_returns.reindex(returns.index)
+    asset_cum = returns.rolling(window, min_periods=window).sum()
+    mkt_cum = mkt.rolling(window, min_periods=window).sum()
+    return asset_cum - mkt_cum

@@ -81,6 +81,9 @@ def main():
     p.add_argument("--cash", type=float, default=100_000.0)
     p.add_argument("--save", type=Path, default=Path("models/xgb_basket"),
                    help="Path stem to save model.")
+    p.add_argument("--market", default="SPY",
+                   help="Market reference symbol for beta + relative-strength "
+                        "features. Set to empty string to disable.")
     args = p.parse_args()
 
     print(f"Universe: {len(args.symbols)} symbols")
@@ -88,14 +91,23 @@ def main():
 
     # --------------------------------------------------------------- load
     loader = MultiLoader(AlpacaLoader())
-    panel = loader.load_basket(args.symbols, args.timeframe, utc(args.start), utc(args.end))
+    symbols_to_load = list(args.symbols)
+    if args.market and args.market not in symbols_to_load:
+        symbols_to_load = symbols_to_load + [args.market]
+    panel = loader.load_basket(symbols_to_load, args.timeframe, utc(args.start), utc(args.end))
     if not panel:
         print("No data for any symbol.")
         return
-    print(f"Loaded {len(panel)}/{len(args.symbols)} symbols")
+    print(f"Loaded {len(panel)}/{len(symbols_to_load)} symbols")
+
+    market_close = panel.get(args.market, pd.DataFrame()).get("close") if args.market else None
 
     # --------------------------------------------------------------- features
-    feat_panel = {sym: build_features(df) for sym, df in panel.items()}
+    feat_panel = {
+        sym: build_features(df, market_close=market_close)
+        for sym, df in panel.items()
+        if sym != args.market  # don't include the market in the training universe
+    }
     feat_panel = {sym: df for sym, df in feat_panel.items() if not df.empty}
     long_feats = panel_to_long(feat_panel)
     if long_feats.empty:
@@ -103,11 +115,21 @@ def main():
         return
 
     # cross-sectional ranks for a few signal columns
-    rank_cols = ["ret_5", "ret_15", "ret_60", "rsi_14", "macd_hist", "bb_pct", "atr_pct", "vol_z_30"]
+    rank_cols = [
+        "ret_5", "ret_15", "ret_60",
+        "rsi_14", "macd_hist", "bb_pct",
+        "atr_pct", "vol_z_30",
+        "dd_20", "runup_20", "dist_ma_50", "dist_ma_200",
+        "rv_20", "rs_20", "rs_60",
+    ]
+    # Only rank columns that actually exist (market-relative ones may be absent)
+    rank_cols = [c for c in rank_cols if c in long_feats.columns]
     long_feats = add_cross_sectional_ranks(long_feats, rank_cols)
 
     # --------------------------------------------------------------- labels
-    close_panel = stack_panel(panel, "close")
+    # Build the close panel from only the universe (exclude market proxy from trading).
+    universe_panel = {s: df for s, df in panel.items() if s != args.market}
+    close_panel = stack_panel(universe_panel, "close")
     labels_wide = forward_top_decile(close_panel, args.horizon, top_q=args.top_q)
     labels_long = labels_wide.stack().rename("y")
     labels_long.index = labels_long.index.set_names(["timestamp", "symbol"])
