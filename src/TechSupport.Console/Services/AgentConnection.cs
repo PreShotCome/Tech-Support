@@ -6,6 +6,24 @@ using TechSupport.Shared.Protocol;
 
 namespace TechSupport.Console.Services;
 
+internal static class ConnLog
+{
+    private static readonly string Path = System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "TechSupport", "console-conn.log");
+
+    public static void Write(string line)
+    {
+        try
+        {
+            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
+            File.AppendAllText(Path,
+                $"[{DateTimeOffset.Now:O}] T{Environment.CurrentManagedThreadId:D3} {line}\n");
+        }
+        catch { /* ignore */ }
+    }
+}
+
 /// <summary>
 /// Technician-side counterpart to SessionHandler. Establishes the TCP
 /// session with an agent, exchanges Hello, and exposes:
@@ -27,10 +45,12 @@ public sealed class AgentConnection : IAsyncDisposable
 
     public async Task ConnectAsync(string host, int port, string technicianName, CancellationToken ct)
     {
+        ConnLog.Write($"ConnectAsync entered host={host} port={port} user={technicianName}");
         await _client.ConnectAsync(host, port, ct).ConfigureAwait(false);
         _client.NoDelay = true;
         _stream = _client.GetStream();
         _reader = PipeReader.Create(_stream);
+        ConnLog.Write("TCP connected, NoDelay set, stream + reader created");
 
         var hello = new HelloMessage(
             AgentId: "console",
@@ -40,10 +60,13 @@ public sealed class AgentConnection : IAsyncDisposable
             Capabilities: new[] { "input.mouse", "input.keyboard" },
             TechnicianName: technicianName);
 
-        await FrameCodec.WriteAsync(_stream, MessageType.Hello,
-            JsonMessages.Encode(hello), ct).ConfigureAwait(false);
+        var helloBytes = JsonMessages.Encode(hello);
+        ConnLog.Write($"About to write Hello, payload={helloBytes.Length} bytes");
+        await FrameCodec.WriteAsync(_stream, MessageType.Hello, helloBytes, ct).ConfigureAwait(false);
+        ConnLog.Write("Hello written; awaiting HelloAck");
 
         var (ackType, ackPayload) = await FrameCodec.ReadAsync(_reader, ct).ConfigureAwait(false);
+        ConnLog.Write($"Received {ackType} ({ackPayload.Length} bytes)");
         if (ackType != MessageType.HelloAck)
             throw new InvalidOperationException($"Expected HelloAck, got {ackType}");
         var ack = JsonMessages.Decode<HelloAckMessage>(ackPayload);
@@ -51,7 +74,9 @@ public sealed class AgentConnection : IAsyncDisposable
 
         if (ack.RequireConsent)
         {
+            ConnLog.Write("Awaiting consent response from agent");
             var (consentType, _) = await FrameCodec.ReadAsync(_reader, ct).ConfigureAwait(false);
+            ConnLog.Write($"Consent response: {consentType}");
             if (consentType == MessageType.ConsentDenied)
                 throw new UnauthorizedAccessException(
                     "The end user denied or ignored the consent prompt.");
