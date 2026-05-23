@@ -1,0 +1,26 @@
+<UserControl x:Class="TechSupport.Console.Views.RemoteDesktopView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             Focusable="True"
+             Background="Black">
+    <Grid>
+        <Image x:Name="FrameImage"
+               Source="{Binding FrameBitmap}"
+               Stretch="Uniform"
+               RenderOptions.BitmapScalingMode="LowQuality"
+               MouseMove="OnMouseMove"
+               MouseDown="OnMouseDown"
+               MouseUp="OnMouseUp"
+               MouseWheel="OnMouseWheel" />
+
+        <Border VerticalAlignment="Top" HorizontalAlignment="Right" Margin="12"
+                Background="{DynamicResource SystemFillColorSolidNeutralBackgroundBrush}"
+                CornerRadius="6" Padding="8,4" Opacity="0.85">
+            <StackPanel Orientation="Horizontal">
+                <ui:SymbolIcon Symbol="Circle12" Foreground="LimeGreen" Margin="0,0,6,0" />
+                <ui:TextBlock FontTypography="Caption" Text="{Binding Title}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>
