@@ -27,18 +27,18 @@
                            IsPaneToggleVisible="True">
             <ui:NavigationView.MenuItems>
                 <ui:NavigationViewItem Content="Home"
-                                       Icon="{ui:SymbolIcon Symbol=Home24}"
+                                       Icon="{ui:SymbolIcon Home24}"
                                        TargetPageType="{x:Type pages:HomePage}" />
                 <ui:NavigationViewItem Content="Customers"
-                                       Icon="{ui:SymbolIcon Symbol=People24}"
+                                       Icon="{ui:SymbolIcon People24}"
                                        TargetPageType="{x:Type pages:CustomersPage}" />
                 <ui:NavigationViewItem Content="History"
-                                       Icon="{ui:SymbolIcon Symbol=History24}"
+                                       Icon="{ui:SymbolIcon History24}"
                                        TargetPageType="{x:Type pages:HistoryPage}" />
             </ui:NavigationView.MenuItems>
             <ui:NavigationView.FooterMenuItems>
                 <ui:NavigationViewItem Content="Settings"
-                                       Icon="{ui:SymbolIcon Symbol=Settings24}"
+                                       Icon="{ui:SymbolIcon Settings24}"
                                        TargetPageType="{x:Type pages:SettingsPage}" />
             </ui:NavigationView.FooterMenuItems>
         </ui:NavigationView>

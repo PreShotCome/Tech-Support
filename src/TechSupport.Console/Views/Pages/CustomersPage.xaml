@@ -19,11 +19,11 @@
                 </Grid.ColumnDefinitions>
                 <ui:TextBox Grid.Column="0"
                             PlaceholderText="Search…"
-                            Icon="{ui:SymbolIcon Symbol=Search24}"
+                            Icon="{ui:SymbolIcon Search24}"
                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
                 <ui:Button Grid.Column="1" Margin="6,0,0,0"
                            Appearance="Primary"
-                           Icon="{ui:SymbolIcon Symbol=Add24}"
+                           Icon="{ui:SymbolIcon Add24}"
                            Command="{Binding NewCommand}" />
             </Grid>
 
@@ -93,7 +93,7 @@
                         </StackPanel>
                         <ui:Button Margin="20,0,0,0"
                                   Appearance="Danger"
-                                  Icon="{ui:SymbolIcon Symbol=Delete24}"
+                                  Icon="{ui:SymbolIcon Delete24}"
                                   Content="Delete"
                                   VerticalAlignment="Center"
                                   Command="{Binding DeleteCommand}" />
@@ -142,17 +142,17 @@
                     <ui:CardExpander Header="Machines" Margin="0,0,0,12" IsExpanded="True">
                         <StackPanel Margin="0,8,0,0">
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <ui:Button Icon="{ui:SymbolIcon Symbol=Add24}"
+                                <ui:Button Icon="{ui:SymbolIcon Add24}"
                                           Content="Add machine"
                                           Command="{Binding AddConnectionCommand}" />
                                 <ui:Button Margin="8,0,0,0"
                                           Appearance="Primary"
-                                          Icon="{ui:SymbolIcon Symbol=Link24}"
+                                          Icon="{ui:SymbolIcon Link24}"
                                           Content="Connect"
                                           Command="{Binding ConnectCommand}" />
                                 <ui:Button Margin="8,0,0,0"
                                           Appearance="Secondary"
-                                          Icon="{ui:SymbolIcon Symbol=Delete24}"
+                                          Icon="{ui:SymbolIcon Delete24}"
                                           Content="Remove"
                                           Command="{Binding RemoveConnectionCommand}" />
                             </StackPanel>

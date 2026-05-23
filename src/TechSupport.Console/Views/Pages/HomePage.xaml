@@ -28,7 +28,7 @@
                            Appearance="Primary"
                            HorizontalAlignment="Stretch"
                            Content="Connect"
-                           Icon="{ui:SymbolIcon Symbol=Link24}"
+                           Icon="{ui:SymbolIcon Link24}"
                            Command="{Binding Home.ConnectCommand}"
                            Margin="0,0,0,16" />
 
@@ -86,7 +86,7 @@
                     Visibility="{Binding ActiveSession, Converter={StaticResource NotNullToVisible}}">
                 <ui:Button Appearance="Secondary"
                           Content="Disconnect"
-                          Icon="{ui:SymbolIcon Symbol=PlugDisconnected24}"
+                          Icon="{ui:SymbolIcon PlugDisconnected24}"
                           Command="{Binding Home.DisconnectCommand}" />
             </Border>
         </Grid>

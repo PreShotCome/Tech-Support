@@ -74,7 +74,7 @@
             <ui:Button Grid.Column="2"
                       Content="Allow"
                       Appearance="Primary"
-                      Icon="{ui:SymbolIcon Symbol=Checkmark24}"
+                      Icon="{ui:SymbolIcon Checkmark24}"
                       Click="OnAllow"
                       MinWidth="100"
                       IsDefault="True" />
