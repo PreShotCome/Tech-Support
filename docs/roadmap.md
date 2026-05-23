@@ -1,6 +1,6 @@
 # Roadmap
 
-## v0 — done (this commit)
+## v0 — done
 
 - Solution + 3 projects
 - DXGI Desktop Duplication capture
@@ -8,6 +8,20 @@
 - Length-prefixed binary protocol, JSON control plane
 - LAN-direct TCP listener (port 7022)
 - WPF technician dashboard with saved connections, quick-connect, remote view
+
+## v0.5 — done (this commit)
+
+- Console restructured around `NavigationView` with Home, Customers,
+  History, Settings pages.
+- **Customer record UI** (the differentiator) — master-detail view
+  with contact fields, freeform notes, a list of machines per customer,
+  and per-customer session history.
+- JSON-backed `CustomerStore` in `%APPDATA%\TechSupport` with
+  debounced writes.
+- Session history tracked automatically on connect / disconnect.
+- **Consent prompt** as a separate WPF exe (`TechSupport.ConsentPrompt`)
+  launched by the agent over a per-request named pipe. Agent refuses
+  to start the session if the user denies or ignores the prompt.
 
 ## v1 — make it useful
 
@@ -17,11 +31,11 @@
    in the console using `MediaFoundationReader` or a managed wrapper.
 2. **Damage-rectangle delta frames.** DXGI reports dirty rects per
    frame — only ship changed regions. Halves bandwidth even before H.264.
-3. **Consent UI.** A separate small WPF app (running in the user's
-   session, not the SYSTEM service) that pops up "Allow technician
-   {Name} to view your screen?" and writes the answer to a named pipe
-   the service reads. The service must NOT inject input until this
-   returns yes.
+3. ~~**Consent UI.**~~ Done in v0.5. Still TODO when the agent runs as
+   the SYSTEM service: replace `Process.Start` with `CreateProcessAsUser`
+   so the prompt appears in the interactive console session rather than
+   session 0. Until then, the prompt only works when the agent runs as
+   the logged-in user.
 4. **Relay.** ASP.NET Core service exposing two WebSocket endpoints
    (`/agent`, `/console`) and a pairing lookup. Bridges bytes between
    agent and console when direct connect isn't possible. Authenticates

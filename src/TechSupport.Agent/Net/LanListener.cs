@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TechSupport.Agent.Capture;
+using TechSupport.Agent.Consent;
 using TechSupport.Agent.Input;
 
 namespace TechSupport.Agent.Net;
@@ -20,19 +21,22 @@ public sealed class LanListener : BackgroundService
     private readonly IScreenCapture _capture;
     private readonly IInputInjector _injector;
     private readonly SessionRegistry _registry;
+    private readonly ConsentBroker _consent;
 
     public LanListener(
         ILogger<LanListener> log,
         IOptions<AgentOptions> options,
         IScreenCapture capture,
         IInputInjector injector,
-        SessionRegistry registry)
+        SessionRegistry registry,
+        ConsentBroker consent)
     {
         _log = log;
         _options = options.Value;
         _capture = capture;
         _injector = injector;
         _registry = registry;
+        _consent = consent;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -71,7 +75,7 @@ public sealed class LanListener : BackgroundService
         try
         {
             using var handler = new SessionHandler(
-                client, _capture, _injector, _registry, _log, remote);
+                client, _capture, _injector, _registry, _consent, _options, _log, remote);
             await handler.RunAsync(ct).ConfigureAwait(false);
         }
         catch (Exception ex)

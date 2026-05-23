@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting.WindowsServices;
 using Serilog;
 using TechSupport.Agent;
 using TechSupport.Agent.Capture;
+using TechSupport.Agent.Consent;
 using TechSupport.Agent.Input;
 using TechSupport.Agent.Net;
 
@@ -18,6 +19,7 @@ builder.Services.AddWindowsService(o => o.ServiceName = "TechSupport.Agent");
 builder.Services.AddSingleton<IScreenCapture, DxgiScreenCapture>();
 builder.Services.AddSingleton<IInputInjector, Win32InputInjector>();
 builder.Services.AddSingleton<SessionRegistry>();
+builder.Services.AddSingleton<ConsentBroker>();
 builder.Services.AddHostedService<AgentService>();
 builder.Services.AddHostedService<LanListener>();
 

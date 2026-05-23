@@ -1,22 +1,36 @@
+using System.Collections.ObjectModel;
+using System.Text.Json.Serialization;
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace TechSupport.Console.Models;
 
-public sealed class Customer
+public partial class Customer : ObservableObject
 {
-    public required string Id { get; init; }
-    public required string Name { get; init; }
-    public string? Organization { get; init; }
-    public string? PhoneNumber { get; init; }
-    public string? Notes { get; set; }
-    public DateTimeOffset LastSession { get; set; }
-    public int SessionCount { get; set; }
-}
+    [ObservableProperty] private string _id = Guid.NewGuid().ToString("N");
+    [ObservableProperty] private string _name = "";
+    [ObservableProperty] private string? _organization;
+    [ObservableProperty] private string? _phoneNumber;
+    [ObservableProperty] private string? _email;
+    [ObservableProperty] private string? _notes;
+    [ObservableProperty] private string? _color;
+    [ObservableProperty] private DateTimeOffset _createdUtc = DateTimeOffset.UtcNow;
+    [ObservableProperty] private DateTimeOffset? _lastSessionUtc;
+    [ObservableProperty] private int _sessionCount;
 
-public sealed class SavedConnection
-{
-    public required string Id { get; init; }
-    public required string Label { get; init; }
-    public required string Host { get; init; }
-    public int Port { get; init; } = 7022;
-    public string? CustomerId { get; init; }
-    public DateTimeOffset? LastConnected { get; set; }
+    public ObservableCollection<SavedConnection> Connections { get; init; } = new();
+    public ObservableCollection<SessionRecord> History { get; init; } = new();
+
+    [JsonIgnore]
+    public string Initials
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Name)) return "?";
+            var parts = Name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 1) return parts[0][..1].ToUpperInvariant();
+            return $"{parts[0][0]}{parts[^1][0]}".ToUpperInvariant();
+        }
+    }
+
+    partial void OnNameChanged(string value) => OnPropertyChanged(nameof(Initials));
 }

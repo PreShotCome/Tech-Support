@@ -1,0 +1,37 @@
+<Page x:Class="TechSupport.Console.Views.Pages.SettingsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Settings">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24" MaxWidth="640" HorizontalAlignment="Left"
+                    DataContext="{Binding Settings}">
+            <ui:TextBlock FontTypography="Title" Text="Settings" Margin="0,0,0,16" />
+
+            <ui:CardExpander Header="Technician" IsExpanded="True" Margin="0,0,0,12">
+                <StackPanel Margin="0,8,0,0">
+                    <ui:TextBlock FontTypography="Caption" Text="Display name" />
+                    <ui:TextBox Text="{Binding TechnicianName, UpdateSourceTrigger=PropertyChanged}" />
+                    <ui:TextBlock FontTypography="Caption" Margin="0,8,0,0"
+                                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                  Text="Shown to the end user during the consent prompt." />
+                </StackPanel>
+            </ui:CardExpander>
+
+            <ui:CardExpander Header="Connection" IsExpanded="True" Margin="0,0,0,12">
+                <StackPanel Margin="0,8,0,0">
+                    <ui:TextBlock FontTypography="Caption" Text="Default port" />
+                    <ui:TextBox Text="{Binding DefaultPort, UpdateSourceTrigger=PropertyChanged}" />
+                </StackPanel>
+            </ui:CardExpander>
+
+            <ui:CardExpander Header="Storage" IsExpanded="False" Margin="0,0,0,12">
+                <StackPanel Margin="0,8,0,0">
+                    <ui:TextBlock FontTypography="Caption" Text="Data folder" />
+                    <ui:TextBox Text="{Binding DataFolder}" IsReadOnly="True" />
+                </StackPanel>
+            </ui:CardExpander>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

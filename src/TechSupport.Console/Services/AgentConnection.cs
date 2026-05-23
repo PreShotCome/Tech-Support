@@ -35,7 +35,8 @@ public sealed class AgentConnection : IAsyncDisposable
             MachineName: Environment.MachineName,
             OsVersion: Environment.OSVersion.VersionString,
             AgentVersion: "0.1.0",
-            Capabilities: new[] { "input.mouse", "input.keyboard" });
+            Capabilities: new[] { "input.mouse", "input.keyboard" },
+            TechnicianName: technicianName);
 
         await FrameCodec.WriteAsync(_stream, MessageType.Hello,
             JsonMessages.Encode(hello), ct).ConfigureAwait(false);
@@ -45,6 +46,17 @@ public sealed class AgentConnection : IAsyncDisposable
             throw new InvalidOperationException($"Expected HelloAck, got {ackType}");
         var ack = JsonMessages.Decode<HelloAckMessage>(ackPayload);
         SessionId = ack.SessionId;
+
+        if (ack.RequireConsent)
+        {
+            var (consentType, _) = await FrameCodec.ReadAsync(_reader, ct).ConfigureAwait(false);
+            if (consentType == MessageType.ConsentDenied)
+                throw new UnauthorizedAccessException(
+                    "The end user denied or ignored the consent prompt.");
+            if (consentType != MessageType.ConsentGranted)
+                throw new InvalidOperationException(
+                    $"Expected consent response, got {consentType}");
+        }
 
         var (infoType, infoPayload) = await FrameCodec.ReadAsync(_reader, ct).ConfigureAwait(false);
         if (infoType != MessageType.DisplayInfo)

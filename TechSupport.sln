@@ -10,6 +10,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TechSupport.Agent", "src\Te
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TechSupport.Console", "src\TechSupport.Console\TechSupport.Console.csproj", "{B0000003-0000-0000-0000-000000000003}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TechSupport.ConsentPrompt", "src\TechSupport.ConsentPrompt\TechSupport.ConsentPrompt.csproj", "{B0000004-0000-0000-0000-000000000004}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -28,10 +30,15 @@ Global
 		{B0000003-0000-0000-0000-000000000003}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B0000003-0000-0000-0000-000000000003}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B0000003-0000-0000-0000-000000000003}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B0000004-0000-0000-0000-000000000004}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B0000004-0000-0000-0000-000000000004}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B0000004-0000-0000-0000-000000000004}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0000004-0000-0000-0000-000000000004}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{B0000001-0000-0000-0000-000000000001} = {A1A1A1A1-1111-1111-1111-111111111111}
 		{B0000002-0000-0000-0000-000000000002} = {A1A1A1A1-1111-1111-1111-111111111111}
 		{B0000003-0000-0000-0000-000000000003} = {A1A1A1A1-1111-1111-1111-111111111111}
+		{B0000004-0000-0000-0000-000000000004} = {A1A1A1A1-1111-1111-1111-111111111111}
 	EndGlobalSection
 EndGlobal

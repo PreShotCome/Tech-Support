@@ -3,9 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:vm="clr-namespace:TechSupport.Console.ViewModels"
-        xmlns:views="clr-namespace:TechSupport.Console.Views"
+        xmlns:pages="clr-namespace:TechSupport.Console.Views.Pages"
         Title="TechSupport Console"
-        Width="1280" Height="800"
+        Width="1280" Height="820"
+        MinWidth="960" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         ExtendsContentIntoTitleBar="True"
         WindowBackdropType="Mica">
@@ -23,76 +24,29 @@
 
         <ui:TitleBar Grid.Row="0" Title="TechSupport Console" />
 
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="320" MinWidth="240" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-
-            <Border Grid.Column="0" Background="{DynamicResource ApplicationBackgroundBrush}" Padding="12">
-                <DockPanel LastChildFill="True">
-                    <ui:TextBlock DockPanel.Dock="Top" FontTypography="Subtitle" Text="Quick connect" Margin="0,0,0,8" />
-                    <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="72" />
-                        </Grid.ColumnDefinitions>
-                        <ui:TextBox Grid.Column="0" PlaceholderText="host or pairing code"
-                                    Text="{Binding QuickConnectHost, UpdateSourceTrigger=PropertyChanged}" />
-                        <ui:TextBox Grid.Column="1" Margin="6,0,0,0"
-                                    Text="{Binding QuickConnectPort, UpdateSourceTrigger=PropertyChanged}" />
-                    </Grid>
-                    <ui:Button DockPanel.Dock="Top"
-                              Appearance="Primary"
-                              HorizontalAlignment="Stretch"
-                              Content="Connect"
-                              Icon="{ui:SymbolIcon Symbol=Link24}"
-                              Command="{Binding ConnectCommand}"
-                              Margin="0,0,0,16" />
-
-                    <ui:TextBlock DockPanel.Dock="Top" FontTypography="Subtitle" Text="Saved" Margin="0,0,0,8" />
-                    <ListBox ItemsSource="{Binding SavedConnections}"
-                             SelectedItem="{Binding SelectedConnection}"
-                             BorderThickness="0"
-                             Background="Transparent">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Margin="0,4">
-                                    <ui:TextBlock FontTypography="BodyStrong" Text="{Binding Label}" />
-                                    <ui:TextBlock FontTypography="Caption" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
-                                        <Run Text="{Binding Host}" />
-                                        <Run Text=":" />
-                                        <Run Text="{Binding Port}" />
-                                    </ui:TextBlock>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </DockPanel>
-            </Border>
-
-            <GridSplitter Grid.Column="1" Width="1" Background="{DynamicResource ControlStrokeColorDefaultBrush}" />
-
-            <Grid Grid.Column="2">
-                <views:RemoteDesktopView DataContext="{Binding ActiveSession}" />
-
-                <Border Background="{DynamicResource ApplicationBackgroundBrush}"
-                        Visibility="{Binding ActiveSession, Converter={StaticResource NullToVisible}}">
-                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <ui:SymbolIcon Symbol="DesktopArrowRight24" FontSize="64"
-                                       HorizontalAlignment="Center" Margin="0,0,0,16"
-                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                        <ui:TextBlock FontTypography="Title" Text="No active session"
-                                      HorizontalAlignment="Center" />
-                        <ui:TextBlock FontTypography="Body"
-                                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                      Text="Enter a host or pick a saved customer to connect."
-                                      HorizontalAlignment="Center" Margin="0,8,0,0" />
-                    </StackPanel>
-                </Border>
-            </Grid>
-        </Grid>
+        <ui:NavigationView Grid.Row="1"
+                           x:Name="Nav"
+                           PaneDisplayMode="Left"
+                           OpenPaneLength="220"
+                           IsBackButtonVisible="Collapsed"
+                           IsPaneToggleVisible="True">
+            <ui:NavigationView.MenuItems>
+                <ui:NavigationViewItem Content="Home"
+                                       Icon="{ui:SymbolIcon Symbol=Home24}"
+                                       TargetPageType="{x:Type pages:HomePage}" />
+                <ui:NavigationViewItem Content="Customers"
+                                       Icon="{ui:SymbolIcon Symbol=People24}"
+                                       TargetPageType="{x:Type pages:CustomersPage}" />
+                <ui:NavigationViewItem Content="History"
+                                       Icon="{ui:SymbolIcon Symbol=History24}"
+                                       TargetPageType="{x:Type pages:HistoryPage}" />
+            </ui:NavigationView.MenuItems>
+            <ui:NavigationView.FooterMenuItems>
+                <ui:NavigationViewItem Content="Settings"
+                                       Icon="{ui:SymbolIcon Symbol=Settings24}"
+                                       TargetPageType="{x:Type pages:SettingsPage}" />
+            </ui:NavigationView.FooterMenuItems>
+        </ui:NavigationView>
 
         <Border Grid.Row="2" Padding="12,6" BorderThickness="0,1,0,0"
                 BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">

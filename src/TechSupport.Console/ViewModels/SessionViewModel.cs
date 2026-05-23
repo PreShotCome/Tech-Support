@@ -18,11 +18,16 @@ public partial class SessionViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private int _displayWidth;
     [ObservableProperty] private int _displayHeight;
     [ObservableProperty] private double _latencyMs;
+    [ObservableProperty] private bool _isConnected;
 
-    public SessionViewModel(string host, int port)
+    public string? CustomerId { get; }
+    public string TechnicianName { get; init; } = Environment.UserName;
+
+    public SessionViewModel(string host, int port, string? customerId = null)
     {
         _host = host;
         _port = port;
+        CustomerId = customerId;
         _title = $"{host}:{port}";
     }
 
@@ -30,7 +35,7 @@ public partial class SessionViewModel : ObservableObject, IAsyncDisposable
     {
         _connection.FrameReceived += OnFrame;
         _connection.Disconnected += OnDisconnected;
-        await _connection.ConnectAsync(_host, _port, Environment.UserName, CancellationToken.None)
+        await _connection.ConnectAsync(_host, _port, TechnicianName, CancellationToken.None)
             .ConfigureAwait(true);
 
         if (_connection.Display is { } d)
@@ -42,6 +47,7 @@ public partial class SessionViewModel : ObservableObject, IAsyncDisposable
                 System.Windows.Media.PixelFormats.Bgra32, null);
             FrameBitmap = _bitmap;
         }
+        IsConnected = true;
     }
 
     private void OnFrame(FrameHeader header, byte[] data)
@@ -59,7 +65,10 @@ public partial class SessionViewModel : ObservableObject, IAsyncDisposable
     private void OnDisconnected(string reason)
     {
         Application.Current?.Dispatcher.Invoke(() =>
-            Title = $"{_host}:{_port} — disconnected ({reason})");
+        {
+            IsConnected = false;
+            Title = $"{_host}:{_port} — disconnected ({reason})";
+        });
     }
 
     public Task SendMouseMoveAsync(int x, int y) =>

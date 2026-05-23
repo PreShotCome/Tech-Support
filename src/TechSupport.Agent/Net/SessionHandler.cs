@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using TechSupport.Agent.Capture;
+using TechSupport.Agent.Consent;
 using TechSupport.Agent.Input;
 using TechSupport.Shared.Protocol;
 
@@ -20,6 +21,8 @@ public sealed class SessionHandler : IDisposable
     private readonly IScreenCapture _capture;
     private readonly IInputInjector _injector;
     private readonly SessionRegistry _registry;
+    private readonly ConsentBroker _consent;
+    private readonly AgentOptions _options;
     private readonly ILogger _log;
     private readonly string _remote;
     private Session? _session;
@@ -29,6 +32,8 @@ public sealed class SessionHandler : IDisposable
         IScreenCapture capture,
         IInputInjector injector,
         SessionRegistry registry,
+        ConsentBroker consent,
+        AgentOptions options,
         ILogger log,
         string remote)
     {
@@ -36,6 +41,8 @@ public sealed class SessionHandler : IDisposable
         _capture = capture;
         _injector = injector;
         _registry = registry;
+        _consent = consent;
+        _options = options;
         _log = log;
         _remote = remote;
     }
@@ -52,9 +59,34 @@ public sealed class SessionHandler : IDisposable
         var hello = JsonMessages.Decode<HelloMessage>(helloPayload);
         var sessionId = Guid.NewGuid().ToString("N");
 
-        var ack = new HelloAckMessage(sessionId, "0.1.0", RequireConsent: false);
+        var ack = new HelloAckMessage(sessionId, "0.1.0", _options.RequireConsent);
         await FrameCodec.WriteAsync(stream, MessageType.HelloAck, JsonMessages.Encode(ack), ct)
             .ConfigureAwait(false);
+
+        if (_options.RequireConsent)
+        {
+            var displayName = !string.IsNullOrWhiteSpace(hello.TechnicianName)
+                ? hello.TechnicianName
+                : $"{hello.MachineName} (unverified)";
+            _log.LogInformation("Awaiting consent from local user for technician {Name}",
+                displayName);
+            var allowed = await _consent.RequestAsync(
+                technicianName: displayName,
+                reason: hello.Reason ?? "Remote support session",
+                timeout: TimeSpan.FromSeconds(_options.ConsentTimeoutSeconds),
+                ct: ct).ConfigureAwait(false);
+
+            if (!allowed)
+            {
+                _log.LogWarning("Local user denied or ignored consent prompt");
+                await FrameCodec.WriteAsync(stream, MessageType.ConsentDenied,
+                    ReadOnlyMemory<byte>.Empty, ct).ConfigureAwait(false);
+                return;
+            }
+
+            await FrameCodec.WriteAsync(stream, MessageType.ConsentGranted,
+                ReadOnlyMemory<byte>.Empty, ct).ConfigureAwait(false);
+        }
 
         _session = new Session(sessionId, hello.AgentId, hello.MachineName, DateTimeOffset.UtcNow, _remote);
         _registry.TryAdd(_session);

@@ -24,14 +24,15 @@ designed for but not yet implemented.
 
 ```
 src/
-  TechSupport.Shared/   Wire protocol, framing, session crypto
-  TechSupport.Agent/    Windows service: DXGI capture, SendInput, TCP listener
-  TechSupport.Console/  WPF technician dashboard (Fluent / Mica)
+  TechSupport.Shared/         Wire protocol, framing, session crypto
+  TechSupport.Agent/          Windows service: DXGI capture, SendInput, TCP listener
+  TechSupport.Console/        WPF technician dashboard (Fluent / Mica)
+  TechSupport.ConsentPrompt/  End-user consent dialog (separate exe)
 scripts/
-  install-agent.ps1     Installs the agent as a Windows service
+  install-agent.ps1           Installs the agent as a Windows service
 docs/
-  architecture.md       How the pieces fit together
-  roadmap.md            What's next: relay, H.264, consent UI, MSI
+  architecture.md             How the pieces fit together
+  roadmap.md                  What's next: relay, H.264, MSI
 ```
 
 ## Build

@@ -24,7 +24,9 @@ public record HelloMessage(
     string MachineName,
     string OsVersion,
     string AgentVersion,
-    string[] Capabilities);
+    string[] Capabilities,
+    string? TechnicianName = null,
+    string? Reason = null);
 
 public record HelloAckMessage(
     string SessionId,
