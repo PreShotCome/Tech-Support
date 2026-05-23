@@ -30,18 +30,16 @@ from trading.models import XgbDirectionModel
 from trading.models.xgb import XgbConfig
 
 
-DEFAULT_UNIVERSE = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA", "AVGO",
-    "BRK.B", "JPM", "JNJ", "V", "PG", "MA", "HD", "CVX", "ABBV",
-    "MRK", "PEP", "KO", "COST", "WMT", "DIS", "BAC", "ADBE",
-    "NFLX", "CRM", "AMD", "INTC", "QCOM",
-    # Subversive Capital "Unusual Whales" ETFs that track disclosed
-    # Congressional trades. NANC (Democratic tracker) returned ~+27% in
-    # 2024 vs SPY +25%. KRUZ (Republican tracker) is intermittently
-    # marked inactive on Alpaca's paper feed; re-add manually if your
-    # account shows it as tradeable.
-    "NANC",
-]
+# Curated universes live in trading.universes; re-exported here so older
+# code (paper_runner, scripts.train, scripts.walkforward...) that imports
+# DEFAULT_UNIVERSE from this module keeps working.
+from trading.universes import (
+    DEFAULT_UNIVERSE,
+    MEGACAP_30,
+    CONGRESSIONAL_PICKS,
+    CONGRESSIONAL_ETFS,
+    MAG_7,
+)
 
 BARS_PER_YEAR = {
     "1Min": 252 * 390,
@@ -93,6 +91,10 @@ def main():
     p.add_argument("--quiver", action="store_true",
                    help="Add Congressional trade features from Quiver Quant. "
                         "Requires QUIVER_API_KEY env var.")
+    p.add_argument("--smart-money", action="store_true",
+                   help="When --quiver is set, restrict the Congressional "
+                        "aggregates to MEMBERS_OF_INTEREST (Pelosi, Wyden, "
+                        "Gottheimer, Mullin, etc.) instead of all members.")
     args = p.parse_args()
 
     print(f"Universe: {len(args.symbols)} symbols")
@@ -129,7 +131,10 @@ def main():
             symbols_for_quiver = list(feat_panel.keys())
             # Use the union of indices so reindex inside the builder is sane
             union_idx = pd.DatetimeIndex(sorted({ts for df in feat_panel.values() for ts in df.index}))
-            cong = build_congressional_features(symbols_for_quiver, union_idx, client=client)
+            cong = build_congressional_features(
+                symbols_for_quiver, union_idx, client=client,
+                members_of_interest=args.smart_money,
+            )
             for sym in symbols_for_quiver:
                 if sym in cong:
                     feat_panel[sym] = feat_panel[sym].join(cong[sym], how="left").fillna(0.0)

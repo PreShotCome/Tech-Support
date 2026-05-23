@@ -8,12 +8,17 @@ just like any other ranked feature.
 All trades are observed from `report_date` (when disclosure happened),
 not `transaction_date` — using transaction_date would leak future info
 because disclosures lag the actual trade by up to 45 days.
+
+Pass `members_of_interest=True` to weight only the curated list of
+frequently-cited high-performing members (see trading.universes); pass
+False (default) to use the full Congressional aggregate.
 """
 from __future__ import annotations
 
 import pandas as pd
 
 from ..data.quiver_client import QuiverClient
+from ..universes import is_member_of_interest
 
 
 def build_congressional_features(
@@ -21,6 +26,7 @@ def build_congressional_features(
     target_index: pd.DatetimeIndex,
     client: QuiverClient | None = None,
     windows: tuple[int, ...] = (30, 90),
+    members_of_interest: bool = False,
 ) -> dict[str, pd.DataFrame]:
     """Return {symbol: DataFrame} where each DataFrame is indexed by
     target_index and contains rolling-window congressional features.
@@ -32,6 +38,9 @@ def build_congressional_features(
         cong_dollars_<N>    net signed dollar magnitude (midpoint of range)
         cong_dem_net_<N>    democrat buys - democrat sells
         cong_rep_net_<N>    republican buys - republican sells
+
+    If `members_of_interest` is True, all aggregates are computed from
+    *only* the curated MEMBERS_OF_INTEREST list (Pelosi, Wyden, etc).
 
     When QUIVER_API_KEY is not set, returns a dict of empty DataFrames
     (still keyed by symbol). The training pipeline can then merge with
@@ -54,6 +63,14 @@ def build_congressional_features(
             continue
 
         df = trades.copy()
+        # Optionally restrict to high-performing members from the research.
+        if members_of_interest:
+            mask = df["representative"].fillna("").apply(is_member_of_interest)
+            df = df.loc[mask]
+            if df.empty:
+                out[sym] = pd.DataFrame(0.0, index=target_index, columns=feat_cols)
+                continue
+
         # Use report_date as the "available" timestamp.
         df = df.dropna(subset=["report_date"])
         df["report_date"] = pd.to_datetime(df["report_date"], utc=True)
@@ -81,8 +98,6 @@ def build_congressional_features(
             feats[f"cong_dem_net_{w}"] = daily["dem_net"].rolling(w, min_periods=1).sum()
             feats[f"cong_rep_net_{w}"] = daily["rep_net"].rolling(w, min_periods=1).sum()
 
-        # Reindex to target_index using as-of join (forward fill); a feature
-        # at time t reflects disclosures available *as of* t.
         feats = feats.reindex(feats.index.union(target_index)).sort_index().ffill().fillna(0.0)
         feats = feats.loc[target_index]
         out[sym] = feats
