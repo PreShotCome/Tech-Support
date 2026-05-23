@@ -72,6 +72,60 @@ RECALL_TOOL = Tool(
 )
 
 
+def _search_transcripts(query: str, max_hits: int = 20) -> dict:
+    """Substring search across past chat transcripts."""
+    from ..transcript_logger import TranscriptLogger
+    hits = TranscriptLogger.search(query, max_hits=max_hits)
+    return {
+        "query": query,
+        "n_hits": len(hits),
+        "hits": hits,
+    }
+
+
+def _list_transcripts(limit: int = 20) -> dict:
+    from ..transcript_logger import TranscriptLogger
+    paths = TranscriptLogger.list_transcripts()
+    paths = paths[-limit:]
+    return {
+        "n_transcripts": len(paths),
+        "files": [{"name": p.name, "bytes": p.stat().st_size} for p in paths],
+    }
+
+
+SEARCH_TRANSCRIPTS_TOOL = Tool(
+    name="search_transcripts",
+    description=(
+        "Search across all past chat transcripts for a substring. Use this "
+        "to recall what was discussed in previous sessions, even if the "
+        "user did not explicitly take a note."
+    ),
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "Substring to search for."},
+            "max_hits": {"type": "integer", "description": "Default 20."},
+        },
+        "required": ["query"],
+        "additionalProperties": False,
+    },
+    handler=_search_transcripts,
+)
+
+LIST_TRANSCRIPTS_TOOL = Tool(
+    name="list_transcripts",
+    description="List the most recent chat transcript files on disk.",
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "limit": {"type": "integer", "description": "Default 20."},
+        },
+        "additionalProperties": False,
+    },
+    handler=_list_transcripts,
+)
+
+
 def register(registry) -> None:
-    for t in (NOTE_TOOL, RECALL_TOOL):
+    for t in (NOTE_TOOL, RECALL_TOOL, SEARCH_TRANSCRIPTS_TOOL, LIST_TRANSCRIPTS_TOOL):
         registry.register(t)

@@ -15,6 +15,7 @@ from typing import Optional
 
 from .llm import ChatMessage, LlmClient
 from .tools import ToolRegistry
+from .transcript_logger import TranscriptLogger
 
 
 # Practical tool-use protocol — added after IDENTITY.md.
@@ -87,29 +88,48 @@ class Agent:
     tools: ToolRegistry
     max_iterations: int = 6
     transcript: list[ChatMessage] = field(default_factory=list)
+    logger: Optional[TranscriptLogger] = None
 
     def __post_init__(self) -> None:
         if not self.transcript:
             self.transcript.append(ChatMessage(
                 role="system", content=build_system_prompt(),
             ))
+        if self.logger is None:
+            self.logger = TranscriptLogger()
 
     def chat(self, user_input: str) -> str:
         self.transcript.append(ChatMessage(role="user", content=user_input))
+        if self.logger:
+            self.logger.event("user", user_input)
 
+        final_text = ""
         for _ in range(self.max_iterations):
             reply = self.llm.chat(self.transcript, tools=self.tools.schemas())
             self.transcript.append(reply)
 
             if not reply.tool_calls:
-                return reply.content or ""
+                final_text = reply.content or ""
+                if self.logger:
+                    self.logger.event("assistant", final_text)
+                return final_text
+
+            # Log the assistant's thinking-step content too, if any.
+            if self.logger and (reply.content or "").strip():
+                self.logger.event("assistant", reply.content)
 
             for tc in reply.tool_calls:
                 tool = self.tools.get(tc.name)
+                if self.logger:
+                    self.logger.event(
+                        "tool_call", str(tc.arguments), name=tc.name,
+                    )
                 if tool is None:
                     result = f"unknown tool: {tc.name}"
                 else:
                     result = tool.call(tc.arguments)
+                if self.logger:
+                    self.logger.event("tool_result", result, name=tc.name)
                 self.transcript.append(ChatMessage(
                     role="tool",
                     name=tc.name,
@@ -117,10 +137,14 @@ class Agent:
                     tool_call_id=tc.id,
                 ))
 
-        return ("(agent stopped after max iterations without producing a "
-                "final answer)")
+        msg = "(agent stopped after max iterations without producing a final answer)"
+        if self.logger:
+            self.logger.event("note", msg)
+        return msg
 
     def reset(self) -> None:
         self.transcript = [ChatMessage(
             role="system", content=build_system_prompt(),
         )]
+        # A reset is a new conversation; start a fresh transcript file.
+        self.logger = TranscriptLogger()
