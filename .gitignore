@@ -68,3 +68,20 @@ __pycache__/
 python/models/
 *.xgb.json
 *.meta.json
+
+## Firebase secrets — the SERVICE ACCOUNT JSON is sensitive (server-level
+## access). Client-side configs (firebase_options.dart, google-services.json,
+## GoogleService-Info.plist) are safe to commit — those keys are embedded in
+## every published build of the app anyway; security comes from Firestore rules.
+firebase-key.json
+*-service-account.json
+*-firebase-adminsdk-*.json
+
+## Flutter
+flutter_app/.dart_tool/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+flutter_app/.packages
+flutter_app/build/
+flutter_app/ios/Pods/
+flutter_app/android/.gradle/

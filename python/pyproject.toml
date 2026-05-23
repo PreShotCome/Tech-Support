@@ -16,6 +16,13 @@ train = [
   "torch>=2.2",
   "tensorboard>=2.16",
 ]
+agent = [
+  "fastembed>=0.4",
+  "numpy>=1.24",
+]
+firebase = [
+  "google-cloud-firestore>=2.18",
+]
 trading = [
   "pandas>=2.0",
   "pyarrow>=14.0",

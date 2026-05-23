@@ -65,10 +65,15 @@ def main():
 
     agent = build_agent(args.backend, args.model)
 
+    from .briefing import briefing_summary_for_human
     backend_name = agent.llm.__class__.__name__
     model_name = getattr(agent.llm, "model", "?") or "(default)"
     print(f"TechSupport agent ready  ·  {backend_name} / {model_name}")
     print(f"Tools: {', '.join(agent.tools.names())}")
+    print()
+    print("Continuity briefing:")
+    print(briefing_summary_for_human())
+    print()
     print("Type /quit to exit, /tools to list tools, /reset to clear transcript.\n")
 
     while True:

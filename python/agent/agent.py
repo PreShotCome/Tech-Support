@@ -17,6 +17,7 @@ from .llm import ChatMessage, LlmClient
 from .tools import ToolRegistry
 from .transcript_logger import TranscriptLogger
 from .state import load_name
+from .briefing import compose_briefing
 
 
 # Practical tool-use protocol — added after IDENTITY.md.
@@ -104,7 +105,15 @@ def _name_block() -> str:
 
 
 def build_system_prompt() -> str:
-    parts = [_load_identity().rstrip(), "---", _name_block(), "---", TOOL_PROTOCOL]
+    parts = [
+        _load_identity().rstrip(),
+        "---",
+        _name_block(),
+        "---",
+        compose_briefing().rstrip(),
+        "---",
+        TOOL_PROTOCOL,
+    ]
     return "\n\n".join(parts)
 
 

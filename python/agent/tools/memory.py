@@ -126,6 +126,52 @@ LIST_TRANSCRIPTS_TOOL = Tool(
 )
 
 
+def _semantic_recall(query: str, top_k: int = 5) -> dict:
+    """Semantic search across past transcripts using local embeddings.
+    Lazy: builds the index on first call, then incrementally on demand.
+    Returns the most relevant chunks ranked by similarity."""
+    try:
+        from ..embeddings import TranscriptIndex
+    except ImportError as e:
+        return {
+            "error": f"semantic recall unavailable ({e}). Install with: pip install -e .[agent]",
+            "fallback": "use search_transcripts for substring search",
+        }
+    try:
+        idx = TranscriptIndex()
+        results = idx.search(query, top_k=top_k)
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+    return {
+        "query": query,
+        "n_results": len(results),
+        "results": results,
+    }
+
+
+SEMANTIC_RECALL_TOOL = Tool(
+    name="semantic_recall",
+    description=(
+        "Semantically search past transcripts for relevant context. Unlike "
+        "search_transcripts (substring match), this finds passages that "
+        "are related in meaning even when phrased differently. Use this "
+        "for 'what did we discuss about X' questions where you don't know "
+        "the exact words that were used."
+    ),
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "Natural-language description of what to find."},
+            "top_k": {"type": "integer", "description": "Number of results. Default 5."},
+        },
+        "required": ["query"],
+        "additionalProperties": False,
+    },
+    handler=_semantic_recall,
+)
+
+
 def register(registry) -> None:
-    for t in (NOTE_TOOL, RECALL_TOOL, SEARCH_TRANSCRIPTS_TOOL, LIST_TRANSCRIPTS_TOOL):
+    for t in (NOTE_TOOL, RECALL_TOOL, SEARCH_TRANSCRIPTS_TOOL,
+              LIST_TRANSCRIPTS_TOOL, SEMANTIC_RECALL_TOOL):
         registry.register(t)
