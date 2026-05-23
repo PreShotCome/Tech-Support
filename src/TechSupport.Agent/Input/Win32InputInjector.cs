@@ -22,7 +22,6 @@ public sealed class Win32InputInjector : IInputInjector
     private const uint MOUSEEVENTF_WHEEL = 0x0800;
     private const uint MOUSEEVENTF_HWHEEL = 0x01000;
     private const uint MOUSEEVENTF_ABSOLUTE = 0x8000;
-    private const uint MOUSEEVENTF_VIRTUALDESK = 0x4000;
 
     private const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
     private const uint KEYEVENTF_KEYUP = 0x0002;
@@ -31,10 +30,8 @@ public sealed class Win32InputInjector : IInputInjector
     private const int XBUTTON1 = 0x0001;
     private const int XBUTTON2 = 0x0002;
 
-    private const int SM_XVIRTUALSCREEN = 76;
-    private const int SM_YVIRTUALSCREEN = 77;
-    private const int SM_CXVIRTUALSCREEN = 78;
-    private const int SM_CYVIRTUALSCREEN = 79;
+    private const int SM_CXSCREEN = 0;
+    private const int SM_CYSCREEN = 1;
 
     public void MoveMouse(int x, int y)
     {
@@ -48,7 +45,7 @@ public sealed class Win32InputInjector : IInputInjector
                 {
                     dx = nx,
                     dy = ny,
-                    dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK,
+                    dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
                 }
             }
         };
@@ -58,7 +55,7 @@ public sealed class Win32InputInjector : IInputInjector
     public void Button(int x, int y, MouseButton button, bool pressed)
     {
         var (nx, ny) = ToNormalizedAbsolute(x, y);
-        uint flags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK;
+        uint flags = MOUSEEVENTF_ABSOLUTE;
         uint mouseData = 0;
 
         switch (button)
@@ -141,7 +138,7 @@ public sealed class Win32InputInjector : IInputInjector
                     dx = nx,
                     dy = ny,
                     mouseData = unchecked((uint)delta),
-                    dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK |
+                    dwFlags = MOUSEEVENTF_ABSOLUTE |
                               (horizontal ? MOUSEEVENTF_HWHEEL : MOUSEEVENTF_WHEEL),
                 }
             }
@@ -151,14 +148,17 @@ public sealed class Win32InputInjector : IInputInjector
 
     private static (int nx, int ny) ToNormalizedAbsolute(int x, int y)
     {
-        var vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
-        var vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
-        var vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
-        var vh = GetSystemMetrics(SM_CYVIRTUALSCREEN);
-        if (vw == 0) vw = 1;
-        if (vh == 0) vh = 1;
-        var nx = (int)(((long)(x - vx) * 65535) / vw);
-        var ny = (int)(((long)(y - vy) * 65535) / vh);
+        // Without MOUSEEVENTF_VIRTUALDESK the absolute coordinates are
+        // interpreted as positions on the primary display, where (0,0) is
+        // top-left and (65535,65535) is bottom-right. Console sends
+        // primary-display-relative pixel coords, which matches because
+        // capture currently grabs the primary display only.
+        var w = GetSystemMetrics(SM_CXSCREEN);
+        var h = GetSystemMetrics(SM_CYSCREEN);
+        if (w == 0) w = 1;
+        if (h == 0) h = 1;
+        var nx = (int)(((long)x * 65535) / w);
+        var ny = (int)(((long)y * 65535) / h);
         return (nx, ny);
     }
 
