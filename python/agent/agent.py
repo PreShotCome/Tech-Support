@@ -39,6 +39,15 @@ account and produce real, current numbers; the memory tools persist
 across sessions; the safety tools are how the framework's limits become
 binding instead of advisory.
 
+## Web access
+
+You have live internet access via `web_search` (DuckDuckGo) and
+`web_fetch` (pull a specific URL, returns readable text). Use them when
+the answer depends on current information you don't already have:
+news, current prices outside the trading tools' coverage, recent
+events, documentation, anything time-sensitive. Don't say "I can't
+check the web" — you can.
+
 ## Trading-specific procedures (the "skills")
 
 The full specs live in docs/skills/. The non-negotiable ones:
