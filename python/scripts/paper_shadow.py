@@ -120,8 +120,35 @@ def train_today_model(symbols: list[str], market: str = "SPY") -> tuple[XgbDirec
         if sym != market
     }
     feat_panel = {s: df for s, df in feat_panel.items() if not df.empty}
+
+    # If Quiver is available, augment per-symbol features with
+    # smart-money-filtered Congressional aggregates. This is the
+    # "historical memory" hook — see docs/bot-playbook.md.
+    try:
+        from trading.data.quiver_client import QuiverClient
+        from trading.features.congressional import build_congressional_features
+        client = QuiverClient()
+        if client.enabled:
+            print("  (quiver: adding smart-money Congressional features)")
+            union_idx = pd.DatetimeIndex(
+                sorted({ts for df in feat_panel.values() for ts in df.index})
+            )
+            cong = build_congressional_features(
+                list(feat_panel.keys()), union_idx,
+                client=client, members_of_interest=True,
+            )
+            for sym in list(feat_panel.keys()):
+                if sym in cong:
+                    feat_panel[sym] = feat_panel[sym].join(cong[sym], how="left").fillna(0.0)
+    except Exception as e:
+        print(f"  (quiver augmentation skipped: {e})")
+
     feats_long = panel_to_long(feat_panel)
-    rank_cols = [c for c in RANK_COL_CANDIDATES if c in feats_long.columns]
+    rank_cols_full = RANK_COL_CANDIDATES + [
+        "cong_net_30", "cong_net_90", "cong_dollars_30",
+        "cong_dem_net_30", "cong_rep_net_30",
+    ]
+    rank_cols = [c for c in rank_cols_full if c in feats_long.columns]
     feats_long = add_cross_sectional_ranks(feats_long, rank_cols)
 
     universe_panel = {s: df for s, df in panel.items() if s != market}
