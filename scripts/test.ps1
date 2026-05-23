@@ -41,12 +41,32 @@ if ($Stop) {
     return
 }
 
-Write-Section "Checking .NET 8 SDK"
-$sdk = & dotnet --list-sdks 2>$null | Where-Object { $_ -match "^8\." }
-if (-not $sdk) {
-    throw ".NET 8 SDK not found. Install it from https://dotnet.microsoft.com/download/dotnet/8.0"
+Write-Section "Checking .NET SDK"
+$sdks = & dotnet --list-sdks 2>$null
+if (-not $sdks) {
+    throw "No .NET SDK found. Install .NET 8 (or newer) from https://dotnet.microsoft.com/download"
 }
-Write-Host ($sdk -join "`n")
+$compatible = $sdks | Where-Object {
+    if ($_ -match "^(\d+)\.") { [int]$Matches[1] -ge 8 } else { $false }
+}
+if (-not $compatible) {
+    throw "Need .NET 8 SDK or newer to build. Installed SDKs:`n$($sdks -join "`n")"
+}
+Write-Host ($compatible -join "`n")
+
+# The apps target net8.0. To RUN them you need either the .NET 8 Desktop
+# Runtime, or roll-forward enabled. Check for the desktop runtime here so
+# the user sees a clear hint before launching anything.
+$runtimes = & dotnet --list-runtimes 2>$null | Where-Object {
+    $_ -match "Microsoft\.WindowsDesktop\.App 8\."
+}
+if (-not $runtimes -and $Run) {
+    Write-Host ""
+    Write-Host "WARNING: .NET 8 Desktop Runtime not detected. The WPF apps need it to run." -ForegroundColor Yellow
+    Write-Host "         Install from: https://dotnet.microsoft.com/download/dotnet/8.0" -ForegroundColor Yellow
+    Write-Host "         (Pick the 'Desktop Runtime' x64 download.)" -ForegroundColor Yellow
+    Write-Host ""
+}
 
 Write-Section "Restoring packages"
 & dotnet restore "$repoRoot\TechSupport.sln" | Out-Null
