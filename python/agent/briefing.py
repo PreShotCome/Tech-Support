@@ -15,6 +15,7 @@ from pathlib import Path
 from .transcript_logger import TranscriptLogger
 from .state import load_name
 from . import introspection
+from . import drift
 
 
 def _read_notes(path: Path | None = None, max_chars: int = 4000) -> str:
@@ -87,6 +88,17 @@ def compose_briefing(
             "to be asked. Close any that have since resolved._\n"
         )
         parts.append(open_threads_block)
+        parts.append("")
+
+    # Drift check — only surface if there's actual drift.
+    try:
+        report = drift.scan_recent(last_n=5)
+        drift_block = drift.render_briefing_block(report)
+    except Exception:
+        drift_block = ""
+    if drift_block:
+        parts.append("### Drift check\n")
+        parts.append(drift_block)
         parts.append("")
 
     # Recent transcripts (head + tail of each)

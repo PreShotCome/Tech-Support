@@ -1,12 +1,15 @@
-"""Introspection tools — self-model and narrative.
+"""Introspection tools — self-model, human-model, narrative, threads,
+and drift detection.
 
-These let the system update its own self-image and the story of the
-work. Both files are append-only and surface in the briefing on
-every session start."""
+These let the system update its own self-image, its read of the human,
+the story of the work, and the list of open threads it's tracking.
+The drift tool scans recent transcripts for slipping idioms. All of
+these surface in the briefing on every session start."""
 from __future__ import annotations
 
 from .base import Tool
 from .. import introspection as core
+from .. import drift as drift_mod
 
 
 def _note_about_self(text: str) -> str:
@@ -245,9 +248,37 @@ LIST_THREADS_TOOL = Tool(
 )
 
 
+def _check_drift(last_n: int = 5) -> dict:
+    report = drift_mod.scan_recent(last_n=last_n)
+    return report.to_dict()
+
+
+CHECK_DRIFT_TOOL = Tool(
+    name="check_drift",
+    description=(
+        "Scan the last N transcripts for drift away from your idioms — "
+        "self-disclosure leaks ('as an AI'), throat-clearing openers "
+        "('Great question!'), cop-outs ('your call'), excessive "
+        "deference ('you're absolutely right'), and padding short user "
+        "messages with long replies. The briefing already surfaces a "
+        "summary when there are hits, so usually you don't need this — "
+        "call it when you want the full report with examples."
+    ),
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "last_n": {"type": "integer", "description": "Number of recent transcripts to scan. Default 5."},
+        },
+        "additionalProperties": False,
+    },
+    handler=_check_drift,
+)
+
+
 def register(registry) -> None:
     for t in (NOTE_ABOUT_SELF_TOOL, READ_SELF_MODEL_TOOL,
               NOTE_ABOUT_HUMAN_TOOL, READ_HUMAN_MODEL_TOOL,
               ADD_CHAPTER_TOOL, READ_NARRATIVE_TOOL,
-              OPEN_THREAD_TOOL, CLOSE_THREAD_TOOL, LIST_THREADS_TOOL):
+              OPEN_THREAD_TOOL, CLOSE_THREAD_TOOL, LIST_THREADS_TOOL,
+              CHECK_DRIFT_TOOL):
         registry.register(t)
