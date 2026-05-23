@@ -164,6 +164,94 @@ SHADOW_REPORT_TOOL = Tool(
 )
 
 
+def _orders(status: str = "open", limit: int = 50) -> dict[str, Any]:
+    """Pull orders from Alpaca paper. status='open' shows pending/accepted
+    only; status='closed' shows filled/cancelled/expired; status='all'
+    shows everything."""
+    from alpaca.trading.requests import GetOrdersRequest
+    from alpaca.trading.enums import QueryOrderStatus
+    c = _trading_client()
+    status_map = {
+        "open": QueryOrderStatus.OPEN,
+        "closed": QueryOrderStatus.CLOSED,
+        "all": QueryOrderStatus.ALL,
+    }
+    qs = status_map.get(status.lower(), QueryOrderStatus.OPEN)
+    req = GetOrdersRequest(status=qs, limit=int(limit))
+    orders = c.get_orders(req)
+
+    rows = []
+    by_status: dict[str, int] = {}
+    for o in orders:
+        s = getattr(o, "status", "")
+        s_str = s.value if hasattr(s, "value") else str(s)
+        by_status[s_str] = by_status.get(s_str, 0) + 1
+        rows.append({
+            "symbol": o.symbol,
+            "side": (o.side.value if hasattr(o.side, "value") else str(o.side)),
+            "qty": float(o.qty) if o.qty else None,
+            "notional": float(o.notional) if o.notional else None,
+            "filled_qty": float(o.filled_qty) if o.filled_qty else 0.0,
+            "filled_avg_price": (float(o.filled_avg_price)
+                                 if o.filled_avg_price else None),
+            "status": s_str,
+            "submitted_at": str(o.submitted_at) if o.submitted_at else None,
+            "filled_at": str(o.filled_at) if o.filled_at else None,
+        })
+
+    return {
+        "status_filter": status,
+        "n_orders": len(rows),
+        "by_status": by_status,
+        "orders": rows,
+    }
+
+
+ORDERS_TOOL = Tool(
+    name="orders",
+    description=("List Alpaca paper orders. Use status='open' (default) "
+                 "to see pending/accepted orders, 'closed' to see "
+                 "filled/cancelled/expired, or 'all' for everything."),
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "status": {
+                "type": "string",
+                "description": "open | closed | all. Default 'open'.",
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Max number of orders to return. Default 50.",
+            },
+        },
+        "additionalProperties": False,
+    },
+    handler=_orders,
+)
+
+
+def _market_clock() -> dict[str, Any]:
+    """Is the US equity market open right now? Returns next open / next close."""
+    c = _trading_client()
+    clock = c.get_clock()
+    return {
+        "is_open": bool(clock.is_open),
+        "timestamp": str(clock.timestamp),
+        "next_open": str(clock.next_open),
+        "next_close": str(clock.next_close),
+    }
+
+
+MARKET_CLOCK_TOOL = Tool(
+    name="market_clock",
+    description=("Check whether the US equity market is open right now, "
+                 "and when it next opens/closes."),
+    parameters_schema={"type": "object", "properties": {}, "additionalProperties": False},
+    handler=_market_clock,
+)
+
+
 def register(registry) -> None:
-    for t in (PORTFOLIO_TOOL, REBALANCE_PLAN_TOOL, SHADOW_REPORT_TOOL):
+    for t in (PORTFOLIO_TOOL, REBALANCE_PLAN_TOOL, SHADOW_REPORT_TOOL,
+              ORDERS_TOOL, MARKET_CLOCK_TOOL):
         registry.register(t)
