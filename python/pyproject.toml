@@ -35,6 +35,12 @@ trading = [
   "matplotlib>=3.7",
   "rich>=13.0",
 ]
+voice = [
+  "sounddevice>=0.4",
+  "soundfile>=0.12",
+  "faster-whisper>=1.0",
+  "pyttsx3>=2.90",
+]
 
 [build-system]
 requires = ["setuptools>=68"]
