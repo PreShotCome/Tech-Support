@@ -1,0 +1,155 @@
+<ui:FluentWindow x:Class="ComputeDashSim.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:local="clr-namespace:ComputeDashSim"
+        Title="Compute Dashboard"
+        Width="780" Height="520"
+        WindowStartupLocation="CenterScreen"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica">
+
+    <Window.DataContext>
+        <local:ComputeModel />
+    </Window.DataContext>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="Compute Dashboard" />
+
+        <Grid Grid.Row="1" Margin="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Big number row -->
+            <Grid Grid.Row="0" Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <ui:TextBlock FontTypography="Caption"
+                                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                  Text="HASHRATE" />
+                    <ui:TextBlock FontTypography="Title">
+                        <Run Text="{Binding HashRateMhs, StringFormat={}{0:F1}}" />
+                        <Run FontSize="14" Text=" MH/s" />
+                    </ui:TextBlock>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1">
+                    <ui:TextBlock FontTypography="Caption"
+                                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                  Text="GPU TEMP" />
+                    <ui:TextBlock FontTypography="Title">
+                        <Run Text="{Binding TemperatureC, StringFormat={}{0:F0}}" />
+                        <Run FontSize="14" Text=" °C" />
+                    </ui:TextBlock>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2">
+                    <ui:TextBlock FontTypography="Caption"
+                                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                  Text="POWER" />
+                    <ui:TextBlock FontTypography="Title">
+                        <Run Text="{Binding PowerWatts, StringFormat={}{0:F0}}" />
+                        <Run FontSize="14" Text=" W" />
+                    </ui:TextBlock>
+                </StackPanel>
+
+                <StackPanel Grid.Column="3">
+                    <ui:TextBlock FontTypography="Caption"
+                                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                  Text="SHARES" />
+                    <ui:TextBlock FontTypography="Title">
+                        <Run Text="{Binding AcceptedShares}" />
+                        <Run FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                            <Run.Text>
+                                <Binding Path="RejectedShares" StringFormat=" / {0}" />
+                            </Run.Text>
+                        </Run>
+                    </ui:TextBlock>
+                </StackPanel>
+            </Grid>
+
+            <!-- Controls panel -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                    <ui:TextBlock FontTypography="Subtitle" Text="Controls" Margin="0,0,0,8" />
+
+                    <ui:TextBlock FontTypography="Caption" Text="Algorithm" Margin="0,8,0,4" />
+                    <ComboBox SelectedValuePath="Tag"
+                              SelectedValue="{Binding Algorithm}">
+                        <ComboBoxItem Content="Ethash" Tag="{x:Static local:HashAlgo.Ethash}" />
+                        <ComboBoxItem Content="KawPow" Tag="{x:Static local:HashAlgo.KawPow}" />
+                        <ComboBoxItem Content="Autolykos" Tag="{x:Static local:HashAlgo.Autolykos}" />
+                        <ComboBoxItem Content="RandomX" Tag="{x:Static local:HashAlgo.RandomX}" />
+                    </ComboBox>
+
+                    <ui:TextBlock FontTypography="Caption" Margin="0,12,0,4">
+                        <Run Text="Fan: " /><Run Text="{Binding FanPercent}" /><Run Text="%" />
+                    </ui:TextBlock>
+                    <Slider Minimum="20" Maximum="100" Value="{Binding FanPercent}" />
+
+                    <ui:Button HorizontalAlignment="Stretch" Margin="0,16,0,0"
+                              Appearance="Primary"
+                              Command="{Binding ToggleCommand}">
+                        <ui:Button.Content>
+                            <TextBlock>
+                                <TextBlock.Text>
+                                    <Binding Path="IsRunning" Converter="{StaticResource RunningToButton}" />
+                                </TextBlock.Text>
+                            </TextBlock>
+                        </ui:Button.Content>
+                    </ui:Button>
+                </StackPanel>
+
+                <Border Grid.Column="1" Margin="10,0,0,0"
+                        Background="{DynamicResource SystemFillColorSolidNeutralBackgroundBrush}"
+                        CornerRadius="8" Padding="16">
+                    <StackPanel>
+                        <ui:TextBlock FontTypography="Subtitle" Text="Status" Margin="0,0,0,8" />
+                        <StackPanel Orientation="Horizontal" Margin="0,4">
+                            <Ellipse Width="10" Height="10" VerticalAlignment="Center">
+                                <Ellipse.Fill>
+                                    <SolidColorBrush>
+                                        <SolidColorBrush.Color>
+                                            <Binding Path="IsRunning" Converter="{StaticResource RunningToColor}" />
+                                        </SolidColorBrush.Color>
+                                    </SolidColorBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
+                            <ui:TextBlock Margin="8,0,0,0" Text="{Binding StatusText}" />
+                        </StackPanel>
+                        <Border Margin="0,12,0,0"
+                                Background="#552B2B"
+                                CornerRadius="4" Padding="10"
+                                Visibility="{Binding HasAlert, Converter={StaticResource BoolToVis}}">
+                            <ui:TextBlock Text="{Binding AlertText}" Foreground="#FFA0A0" TextWrapping="Wrap" />
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <ui:TextBlock Grid.Row="2" FontTypography="Caption"
+                          Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                          Margin="0,16,0,0"
+                          Text="Simulation only. No actual cryptocurrency mining. Values are not real and no compute is performed." />
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

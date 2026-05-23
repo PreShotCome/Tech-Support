@@ -55,6 +55,7 @@ builder.Services.AddSingleton<SessionRegistry>();
 builder.Services.AddSingleton<ConsentBroker>();
 builder.Services.AddHostedService<AgentService>();
 builder.Services.AddHostedService<LanListener>();
+builder.Services.AddHostedService<HttpControlServer>();
 
 builder.Services.AddSerilog((sp, lc) => lc
     .ReadFrom.Configuration(builder.Configuration));
