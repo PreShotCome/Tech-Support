@@ -75,27 +75,32 @@ def build_breadth_features(close_panel: pd.DataFrame) -> pd.DataFrame:
     """Cross-sectional breadth: features that summarize how broadly the
     basket is participating in (or fleeing) the move.
 
-    `close_panel` is wide: index=timestamp, columns=symbols."""
+    `close_panel` is wide: index=timestamp, columns=symbols. Tolerant of
+    missing data: when a stock has no history yet it's just excluded
+    from that row's average rather than nulling the whole row."""
     ret = np.log(close_panel).diff()
 
-    ma_20 = close_panel.rolling(20).mean()
-    ma_50 = close_panel.rolling(50).mean()
-    ma_200 = close_panel.rolling(200).mean()
+    ma_20 = close_panel.rolling(20, min_periods=10).mean()
+    ma_50 = close_panel.rolling(50, min_periods=25).mean()
+    ma_200 = close_panel.rolling(200, min_periods=100).mean()
 
     feats = pd.DataFrame(index=close_panel.index)
 
-    feats["pct_above_ma_20"] = (close_panel > ma_20).mean(axis=1)
-    feats["pct_above_ma_50"] = (close_panel > ma_50).mean(axis=1)
-    feats["pct_above_ma_200"] = (close_panel > ma_200).mean(axis=1)
+    def _pct_above(close, ma):
+        valid = ma.notna() & close.notna()
+        above = (close > ma) & valid
+        denom = valid.sum(axis=1).replace(0, np.nan)
+        return above.sum(axis=1) / denom
 
-    # Cross-sectional dispersion of recent returns: rising during crashes
-    feats["xs_std_5"] = ret.rolling(5).sum().std(axis=1)
-    feats["xs_std_20"] = ret.rolling(20).sum().std(axis=1)
+    feats["pct_above_ma_20"] = _pct_above(close_panel, ma_20)
+    feats["pct_above_ma_50"] = _pct_above(close_panel, ma_50)
+    feats["pct_above_ma_200"] = _pct_above(close_panel, ma_200)
 
-    # Average pairwise correlation rises before stress.
-    # Approximated cheaply as 1 - (basket variance / mean variance).
-    bvar = ret.rolling(20).mean().var(axis=1)
-    mvar = ret.rolling(20).var().mean(axis=1).replace(0, np.nan)
+    feats["xs_std_5"] = ret.rolling(5, min_periods=3).sum().std(axis=1)
+    feats["xs_std_20"] = ret.rolling(20, min_periods=10).sum().std(axis=1)
+
+    bvar = ret.rolling(20, min_periods=10).mean().var(axis=1)
+    mvar = ret.rolling(20, min_periods=10).var().mean(axis=1).replace(0, np.nan)
     feats["avg_corr_proxy"] = 1.0 - (bvar / mvar)
 
-    return feats.dropna()
+    return feats

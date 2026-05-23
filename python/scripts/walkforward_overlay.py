@@ -85,9 +85,17 @@ def run_window(
     cut = int(len(X_tr) * 0.9)
     X_va, y_va = X_tr.iloc[cut:], y_tr.iloc[cut:]
     X_tr, y_tr = X_tr.iloc[:cut], y_tr.iloc[:cut]
+    # If the val slice has only one class, skip val (early stopping disabled);
+    # the model still trains, we just don't get a val_auc this window.
+    if y_va.nunique() < 2:
+        X_va, y_va = None, None
 
     model = XgbDirectionModel(horizon=horizon, config=XgbConfig())
-    report = model.fit(X_tr, y_tr, X_va, y_va)
+    try:
+        report = model.fit(X_tr, y_tr, X_va, y_va)
+    except ValueError as e:
+        # Fall back to no-val training if sklearn complains about classes.
+        report = model.fit(X_tr, y_tr, None, None)
     val_auc = float(report.get("val_auc", float("nan")))
 
     p = model.predict_proba(X_te)
@@ -98,8 +106,12 @@ def run_window(
     n = len(universe)
     test_close = close_panel.loc[test_df.index[0]: test_df.index[-1], universe]
 
-    # Overlay: full basket weight when safe, scaled when risk-off
-    exposure = np.where(p_series.values >= risk_off_threshold, risk_off_weight, 1.0)
+    # Exposure: smooth (when threshold is negative sentinel) or binary.
+    if risk_off_threshold < 0:
+        exposure = 1.0 - p_series.values * (1.0 - risk_off_weight)
+    else:
+        exposure = np.where(p_series.values >= risk_off_threshold, risk_off_weight, 1.0)
+    exposure = np.clip(exposure, 0.0, 1.0)
     exposure_s = pd.Series(exposure, index=p_series.index)
     weights_overlay = pd.DataFrame(
         np.tile((1.0 / n) * exposure_s.values[:, None], (1, n)),
@@ -147,6 +159,10 @@ def main():
                    help="P(drawdown) above which we cut exposure (default 0.50).")
     p.add_argument("--risk-off-weight", type=float, default=0.30,
                    help="Basket exposure when model says risk-off (default 0.30).")
+    p.add_argument("--smooth", action="store_true",
+                   help="Smooth-scale exposure as 1 - p*(1 - risk_off_weight) "
+                        "instead of binary threshold. Avoids being stuck in "
+                        "risk-off after the regime improves.")
     p.add_argument("--train-years", type=float, default=5.0)
     p.add_argument("--test-months", type=int, default=6)
     p.add_argument("--step-months", type=int, default=6)
@@ -171,7 +187,14 @@ def main():
     # ---------------- Features + labels ----------------
     spy_feats = build_regime_features(spy)
     breadth = build_breadth_features(close_panel)
-    feats = spy_feats.join(breadth, how="inner").dropna()
+    feats = spy_feats.join(breadth, how="left")
+    # Median-impute the breadth columns rather than drop rows. The
+    # SPY-only features carry most of the signal; we'd rather train on
+    # an imputed breadth value than discard the whole bar.
+    breadth_cols = list(breadth.columns)
+    feats[breadth_cols] = feats[breadth_cols].fillna(feats[breadth_cols].median())
+    # Final dropna removes only rows missing core SPY features.
+    feats = feats.dropna()
     labels = forward_drawdown_label(spy["close"], args.horizon, args.drawdown_threshold)
     print(f"Features: {feats.shape[1]} cols, {len(feats):,} rows")
     print(f"Label positive rate: {labels.mean():.3f} "
@@ -203,7 +226,8 @@ def main():
                 feats, labels, close_panel,
                 ts, te, vs, ve,
                 horizon=args.horizon,
-                risk_off_threshold=args.risk_off_threshold,
+                # Use -1.0 sentinel to flip the engine into smooth mode.
+                risk_off_threshold=(-1.0 if args.smooth else args.risk_off_threshold),
                 risk_off_weight=args.risk_off_weight,
                 cfg=cfg,
                 bars_per_year=bpy,
