@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.IO;
-using System.IO.Pipelines;
 using System.Net.Sockets;
 using TechSupport.Shared.Protocol;
 
@@ -34,7 +33,6 @@ public sealed class AgentConnection : IAsyncDisposable
 {
     private readonly TcpClient _client = new();
     private NetworkStream? _stream;
-    private PipeReader? _reader;
     private CancellationTokenSource? _cts;
 
     public DisplayInfoMessage? Display { get; private set; }
@@ -49,8 +47,7 @@ public sealed class AgentConnection : IAsyncDisposable
         await _client.ConnectAsync(host, port, ct).ConfigureAwait(false);
         _client.NoDelay = true;
         _stream = _client.GetStream();
-        _reader = PipeReader.Create(_stream);
-        ConnLog.Write("TCP connected, NoDelay set, stream + reader created");
+        ConnLog.Write("TCP connected, NoDelay set, stream created");
 
         var hello = new HelloMessage(
             AgentId: "console",
@@ -65,7 +62,7 @@ public sealed class AgentConnection : IAsyncDisposable
         await FrameCodec.WriteAsync(_stream, MessageType.Hello, helloBytes, ct).ConfigureAwait(false);
         ConnLog.Write("Hello written; awaiting HelloAck");
 
-        var (ackType, ackPayload) = await FrameCodec.ReadAsync(_reader, ct).ConfigureAwait(false);
+        var (ackType, ackPayload) = await FrameCodec.ReadFromStreamAsync(_stream, ct).ConfigureAwait(false);
         ConnLog.Write($"Received {ackType} ({ackPayload.Length} bytes)");
         if (ackType != MessageType.HelloAck)
             throw new InvalidOperationException($"Expected HelloAck, got {ackType}");
@@ -75,7 +72,7 @@ public sealed class AgentConnection : IAsyncDisposable
         if (ack.RequireConsent)
         {
             ConnLog.Write("Awaiting consent response from agent");
-            var (consentType, _) = await FrameCodec.ReadAsync(_reader, ct).ConfigureAwait(false);
+            var (consentType, _) = await FrameCodec.ReadFromStreamAsync(_stream, ct).ConfigureAwait(false);
             ConnLog.Write($"Consent response: {consentType}");
             if (consentType == MessageType.ConsentDenied)
                 throw new UnauthorizedAccessException(
@@ -85,7 +82,7 @@ public sealed class AgentConnection : IAsyncDisposable
                     $"Expected consent response, got {consentType}");
         }
 
-        var (infoType, infoPayload) = await FrameCodec.ReadAsync(_reader, ct).ConfigureAwait(false);
+        var (infoType, infoPayload) = await FrameCodec.ReadFromStreamAsync(_stream, ct).ConfigureAwait(false);
         if (infoType != MessageType.DisplayInfo)
             throw new InvalidOperationException($"Expected DisplayInfo, got {infoType}");
         Display = JsonMessages.Decode<DisplayInfoMessage>(infoPayload);
@@ -98,9 +95,9 @@ public sealed class AgentConnection : IAsyncDisposable
     {
         try
         {
-            while (!ct.IsCancellationRequested && _reader is not null && _stream is not null)
+            while (!ct.IsCancellationRequested && _stream is not null)
             {
-                var (type, payload) = await FrameCodec.ReadAsync(_reader, ct).ConfigureAwait(false);
+                var (type, payload) = await FrameCodec.ReadFromStreamAsync(_stream, ct).ConfigureAwait(false);
                 if (type is MessageType.FrameKey or MessageType.FrameDelta)
                 {
                     var header = JsonMessages.Decode<FrameHeader>(payload);

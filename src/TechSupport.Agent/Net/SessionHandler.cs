@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.IO.Pipelines;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
@@ -52,10 +51,9 @@ public sealed class SessionHandler : IDisposable
         _log.LogInformation("Session {Remote}: handler started", _remote);
         _client.NoDelay = true;
         var stream = _client.GetStream();
-        var reader = PipeReader.Create(stream);
 
         _log.LogInformation("Session {Remote}: waiting for Hello", _remote);
-        var (helloType, helloPayload) = await FrameCodec.ReadAsync(reader, ct).ConfigureAwait(false);
+        var (helloType, helloPayload) = await FrameCodec.ReadFromStreamAsync(stream, ct).ConfigureAwait(false);
         _log.LogInformation("Session {Remote}: received {Type} ({Bytes} bytes)",
             _remote, helloType, helloPayload.Length);
         if (helloType != MessageType.Hello)
@@ -107,7 +105,7 @@ public sealed class SessionHandler : IDisposable
             .ConfigureAwait(false);
 
         var frameTask = PumpFramesAsync(stream, ct);
-        var inputTask = PumpInputAsync(reader, ct);
+        var inputTask = PumpInputAsync(stream, ct);
         await Task.WhenAny(frameTask, inputTask).ConfigureAwait(false);
     }
 
@@ -155,11 +153,11 @@ public sealed class SessionHandler : IDisposable
         }
     }
 
-    private async Task PumpInputAsync(PipeReader reader, CancellationToken ct)
+    private async Task PumpInputAsync(NetworkStream stream, CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
-            var (type, payload) = await FrameCodec.ReadAsync(reader, ct).ConfigureAwait(false);
+            var (type, payload) = await FrameCodec.ReadFromStreamAsync(stream, ct).ConfigureAwait(false);
             switch (type)
             {
                 case MessageType.MouseMove:

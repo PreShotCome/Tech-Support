@@ -49,6 +49,43 @@ public static class FrameCodec
         }
     }
 
+    /// <summary>
+    /// Raw-stream alternative to the PipeReader version. Reads exactly
+    /// the bytes it needs from the stream so we don't depend on
+    /// StreamPipeReader semantics, which can stall over loopback
+    /// NetworkStreams in some Windows configurations.
+    /// </summary>
+    public static async ValueTask<(MessageType Type, byte[] Payload)> ReadFromStreamAsync(
+        Stream stream,
+        CancellationToken ct = default)
+    {
+        var header = new byte[5];
+        await ReadExactAsync(stream, header, ct).ConfigureAwait(false);
+        var length = BinaryPrimitives.ReadUInt32BigEndian(header);
+        if (length == 0 || length > MaxFrameSize)
+            throw new InvalidDataException($"Frame length {length} out of range.");
+        var type = (MessageType)header[4];
+
+        var payloadLength = (int)length - 1;
+        var payload = new byte[payloadLength];
+        if (payloadLength > 0)
+            await ReadExactAsync(stream, payload, ct).ConfigureAwait(false);
+        return (type, payload);
+    }
+
+    private static async ValueTask ReadExactAsync(Stream stream, Memory<byte> buffer, CancellationToken ct)
+    {
+        var remaining = buffer;
+        while (!remaining.IsEmpty)
+        {
+            var n = await stream.ReadAsync(remaining, ct).ConfigureAwait(false);
+            if (n == 0)
+                throw new EndOfStreamException(
+                    $"Stream closed with {remaining.Length} bytes still expected.");
+            remaining = remaining.Slice(n);
+        }
+    }
+
     private static bool TryParse(
         ref ReadOnlySequence<byte> buffer,
         out MessageType type,
