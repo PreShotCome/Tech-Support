@@ -35,10 +35,12 @@ DEFAULT_UNIVERSE = [
     "BRK.B", "JPM", "JNJ", "V", "PG", "MA", "HD", "CVX", "ABBV",
     "MRK", "PEP", "KO", "COST", "WMT", "DIS", "BAC", "ADBE",
     "NFLX", "CRM", "AMD", "INTC", "QCOM",
-    # Subversive Capital ETFs that track disclosed Congressional trades.
-    # NANC = Democrats, KRUZ = Republicans. Per the 2024 Unusual Whales
-    # report, NANC returned ~+27% in 2024 vs SPY +25%.
-    "NANC", "KRUZ",
+    # Subversive Capital "Unusual Whales" ETFs that track disclosed
+    # Congressional trades. NANC (Democratic tracker) returned ~+27% in
+    # 2024 vs SPY +25%. KRUZ (Republican tracker) is intermittently
+    # marked inactive on Alpaca's paper feed; re-add manually if your
+    # account shows it as tradeable.
+    "NANC",
 ]
 
 BARS_PER_YEAR = {
