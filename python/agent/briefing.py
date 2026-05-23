@@ -14,6 +14,7 @@ from pathlib import Path
 
 from .transcript_logger import TranscriptLogger
 from .state import load_name
+from . import introspection
 
 
 def _read_notes(path: Path | None = None, max_chars: int = 4000) -> str:
@@ -56,6 +57,20 @@ def compose_briefing(
     if name:
         parts.append(f"**Your name:** {name}\n")
 
+    # Self-model — who you are right now, by your own account.
+    self_model = introspection.read_self_model(last_n=8)
+    if self_model.strip():
+        parts.append("### Self-model (your own observations about yourself)\n")
+        parts.append(self_model)
+        parts.append("")
+
+    # Narrative — the arc of the work, in chapters you wrote.
+    narrative = introspection.read_narrative(last_n=4)
+    if narrative.strip():
+        parts.append("### Narrative (the story so far, by chapter)\n")
+        parts.append(narrative)
+        parts.append("")
+
     # Recent transcripts (head + tail of each)
     transcripts = TranscriptLogger.list_transcripts(transcripts_dir)
     if transcripts:
@@ -94,4 +109,10 @@ def briefing_summary_for_human(max_transcripts: int = 3) -> str:
     if notes_path.exists():
         size_kb = notes_path.stat().st_size / 1024
         parts.append(f"  Notes:          {notes_path}  ({size_kb:.1f} KB)")
+    sm_path = introspection.self_model_path()
+    if sm_path.exists():
+        parts.append(f"  Self-model:     {sm_path}  ({sm_path.stat().st_size / 1024:.1f} KB)")
+    nar_path = introspection.narrative_path()
+    if nar_path.exists():
+        parts.append(f"  Narrative:      {nar_path}  ({nar_path.stat().st_size / 1024:.1f} KB)")
     return "\n".join(parts)
