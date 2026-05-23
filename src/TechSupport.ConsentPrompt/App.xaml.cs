@@ -67,8 +67,7 @@ public partial class App : Application
             await pipe.ConnectAsync(5000).ConfigureAwait(true);
             Log($"Connected to pipe {pipeName}");
 
-            var reader = System.IO.Pipelines.PipeReader.Create(pipe);
-            var (type, payload) = await FrameCodec.ReadAsync(reader).ConfigureAwait(true);
+            var (type, payload) = await FrameCodec.ReadFromStreamAsync(pipe).ConfigureAwait(true);
             if (type != MessageType.ConsentPrompt)
             {
                 Log($"Unexpected first message: {type}");

@@ -92,13 +92,12 @@ public sealed class ConsentBroker
         await FrameCodec.WriteAsync(
             server, MessageType.ConsentPrompt, JsonMessages.Encode(prompt), ct).ConfigureAwait(false);
 
-        var reader = PipeReader.Create(server);
         using var replyCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         replyCts.CancelAfter(timeout + TimeSpan.FromSeconds(5));
 
         try
         {
-            var (type, _) = await FrameCodec.ReadAsync(reader, replyCts.Token).ConfigureAwait(false);
+            var (type, _) = await FrameCodec.ReadFromStreamAsync(server, replyCts.Token).ConfigureAwait(false);
             return type == MessageType.ConsentGranted;
         }
         catch (OperationCanceledException)
