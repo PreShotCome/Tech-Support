@@ -49,10 +49,15 @@ public sealed class SessionHandler : IDisposable
 
     public async Task RunAsync(CancellationToken ct)
     {
+        _log.LogInformation("Session {Remote}: handler started", _remote);
+        _client.NoDelay = true;
         var stream = _client.GetStream();
         var reader = PipeReader.Create(stream);
 
+        _log.LogInformation("Session {Remote}: waiting for Hello", _remote);
         var (helloType, helloPayload) = await FrameCodec.ReadAsync(reader, ct).ConfigureAwait(false);
+        _log.LogInformation("Session {Remote}: received {Type} ({Bytes} bytes)",
+            _remote, helloType, helloPayload.Length);
         if (helloType != MessageType.Hello)
             throw new InvalidOperationException($"Expected Hello, got {helloType}");
 
@@ -62,6 +67,8 @@ public sealed class SessionHandler : IDisposable
         var ack = new HelloAckMessage(sessionId, "0.1.0", _options.RequireConsent);
         await FrameCodec.WriteAsync(stream, MessageType.HelloAck, JsonMessages.Encode(ack), ct)
             .ConfigureAwait(false);
+        _log.LogInformation("Session {Remote}: HelloAck sent (RequireConsent={Req})",
+            _remote, _options.RequireConsent);
 
         if (_options.RequireConsent)
         {
@@ -75,6 +82,7 @@ public sealed class SessionHandler : IDisposable
                 reason: hello.Reason ?? "Remote support session",
                 timeout: TimeSpan.FromSeconds(_options.ConsentTimeoutSeconds),
                 ct: ct).ConfigureAwait(false);
+            _log.LogInformation("Consent decision: allowed={Allowed}", allowed);
 
             if (!allowed)
             {

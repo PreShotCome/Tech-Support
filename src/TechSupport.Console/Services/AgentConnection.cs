@@ -28,6 +28,7 @@ public sealed class AgentConnection : IAsyncDisposable
     public async Task ConnectAsync(string host, int port, string technicianName, CancellationToken ct)
     {
         await _client.ConnectAsync(host, port, ct).ConfigureAwait(false);
+        _client.NoDelay = true;
         _stream = _client.GetStream();
         _reader = PipeReader.Create(_stream);
 

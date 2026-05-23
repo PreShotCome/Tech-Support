@@ -45,6 +45,7 @@ public sealed class ConsentBroker
         TimeSpan timeout,
         CancellationToken ct)
     {
+        _log.LogInformation("ConsentBroker.RequestAsync: prompt exe = {Path}", _promptExecutablePath);
         if (!File.Exists(_promptExecutablePath))
         {
             _log.LogWarning(
@@ -54,6 +55,7 @@ public sealed class ConsentBroker
         }
 
         var pipeName = $"TechSupport.Consent.{Guid.NewGuid():N}";
+        _log.LogInformation("ConsentBroker: pipe name {Pipe}", pipeName);
 
         await using var server = new NamedPipeServerStream(
             pipeName,
@@ -63,17 +65,25 @@ public sealed class ConsentBroker
             System.IO.Pipes.PipeOptions.Asynchronous);
 
         using var process = StartPromptProcess(pipeName);
-        if (process is null) return false;
+        if (process is null)
+        {
+            _log.LogWarning("ConsentBroker: StartPromptProcess returned null");
+            return false;
+        }
+        _log.LogInformation("ConsentBroker: prompt PID {Pid}", process.Id);
 
         using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         connectCts.CancelAfter(TimeSpan.FromSeconds(5));
         try
         {
             await server.WaitForConnectionAsync(connectCts.Token).ConfigureAwait(false);
+            _log.LogInformation("ConsentBroker: prompt connected to pipe");
         }
         catch (OperationCanceledException)
         {
-            _log.LogWarning("Consent prompt failed to connect within 5s; auto-denying.");
+            _log.LogWarning(
+                "Consent prompt failed to connect within 5s (HasExited={Exited}, ExitCode={Code}); auto-denying.",
+                process.HasExited, process.HasExited ? process.ExitCode : -1);
             try { process.Kill(); } catch { /* best effort */ }
             return false;
         }
