@@ -140,9 +140,9 @@ def main():
     p.add_argument("--start", required=True)
     p.add_argument("--end", required=True)
     p.add_argument("--horizon", type=int, default=20,
-                   help="Bars ahead to look for drawdown (default 20 ≈ 1 month).")
+                   help="Bars ahead to look for drawdown (default 20 = about 1 month).")
     p.add_argument("--drawdown-threshold", type=float, default=0.05,
-                   help="Drawdown magnitude that counts as 'risk-off' (default 5%).")
+                   help="Drawdown magnitude that counts as risk-off (default 0.05).")
     p.add_argument("--risk-off-threshold", type=float, default=0.50,
                    help="P(drawdown) above which we cut exposure (default 0.50).")
     p.add_argument("--risk-off-weight", type=float, default=0.30,
