@@ -63,3 +63,8 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+## Saved ML models
+python/models/
+*.xgb.json
+*.meta.json
