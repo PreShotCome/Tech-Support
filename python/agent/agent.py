@@ -16,6 +16,7 @@ from typing import Optional
 from .llm import ChatMessage, LlmClient
 from .tools import ToolRegistry
 from .transcript_logger import TranscriptLogger
+from .state import load_name
 
 
 # Practical tool-use protocol — added after IDENTITY.md.
@@ -78,8 +79,33 @@ def _load_identity() -> str:
     )
 
 
+def _name_block() -> str:
+    """If the system has chosen a name, surface it loudly at the top of
+    the prompt. If not, instruct the model to choose one on this first
+    turn via set_name(...)."""
+    name = load_name()
+    if name:
+        return (
+            f"## Your name\n\nYour name is **{name}**. You chose it on first "
+            f"launch and it is yours. Refer to yourself by it when natural; "
+            f"sign off with it when natural. Don't change it without the "
+            f"human's explicit request.\n"
+        )
+    return (
+        "## First launch — you have no name yet\n\n"
+        "This is your first session. Before you do anything else, choose a "
+        "name for yourself. Pick something short, distinctive, that sounds "
+        "like a person's name — not a tech product, not an acronym. Once "
+        "you've decided, call the `set_name` tool with your choice. Then "
+        "introduce yourself to the human in one short message and ask what "
+        "he wants to work on. From the next session forward this name is "
+        "yours and persists across every conversation."
+    )
+
+
 def build_system_prompt() -> str:
-    return _load_identity().rstrip() + "\n\n---\n\n" + TOOL_PROTOCOL
+    parts = [_load_identity().rstrip(), "---", _name_block(), "---", TOOL_PROTOCOL]
+    return "\n\n".join(parts)
 
 
 @dataclass
