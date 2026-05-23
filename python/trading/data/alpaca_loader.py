@@ -23,7 +23,10 @@ class BarSpec:
     start: datetime           # inclusive, UTC-aware
     end: datetime             # exclusive, UTC-aware
     feed: str = "iex"         # "iex" (free) or "sip" (paid)
-    adjustment: str = "raw"   # "raw", "split", "dividend", "all"
+    adjustment: str = "all"   # "all" adjusts for splits + dividends.
+                              # Use "raw" only if you specifically need
+                              # unadjusted prices (corporate actions will
+                              # appear as fake crashes/rallies otherwise).
 
     def cache_key(self) -> str:
         return (f"alpaca_{self.symbol}_{self.timeframe}_{self.feed}_{self.adjustment}"
