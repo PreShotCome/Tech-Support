@@ -65,13 +65,17 @@ class ClaudeCliClient(LlmClient):
         temperature: float = 0.2,
     ) -> ChatMessage:
         prompt = _build_prompt(messages, tools)
-        cmd = [self.executable, "-p", prompt, "--output-format", "text"]
+        # Pipe the prompt through stdin instead of as a positional arg.
+        # The matrix briefing pushes the system prompt well past Windows'
+        # ~8000-char command-line limit (WinError 206 otherwise).
+        cmd = [self.executable, "-p", "--output-format", "text"]
         if self.model:
             cmd.extend(["--model", self.model])
 
         try:
             result = subprocess.run(
-                cmd, capture_output=True, text=True,
+                cmd, input=prompt,
+                capture_output=True, text=True,
                 encoding="utf-8", errors="replace",
                 timeout=self.timeout, check=False,
             )
