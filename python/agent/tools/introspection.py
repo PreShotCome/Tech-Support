@@ -165,8 +165,89 @@ READ_NARRATIVE_TOOL = Tool(
 )
 
 
+def _open_thread(description: str) -> dict:
+    return core.open_thread(description)
+
+
+def _close_thread(thread_id: str, resolution: str) -> dict:
+    return core.close_thread(thread_id, resolution)
+
+
+def _list_threads(status: str = "open") -> dict:
+    threads = core.list_threads(status=status)
+    return {
+        "status_filter": status,
+        "n_threads": len(threads),
+        "threads": threads,
+    }
+
+
+OPEN_THREAD_TOOL = Tool(
+    name="open_thread",
+    description=(
+        "Open a new thread — something unresolved worth bringing up "
+        "unprompted in a future session. Think of it as a friend's "
+        "'remind me to ask about X' note. Use for: questions left "
+        "hanging, plans made but not executed, things the human said "
+        "he'd check on and didn't, unfinished work you noticed. NOT a "
+        "general task list — only things worth proactively bringing "
+        "up. The briefing surfaces all open threads on session start."
+    ),
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "description": {"type": "string", "description": "What's unresolved, in one or two sentences."},
+        },
+        "required": ["description"],
+        "additionalProperties": False,
+    },
+    handler=_open_thread,
+)
+
+
+CLOSE_THREAD_TOOL = Tool(
+    name="close_thread",
+    description=(
+        "Close an open thread with a resolution note. The thread stays "
+        "in the file for history but stops surfacing in the briefing. "
+        "Use when the underlying question got answered, the plan got "
+        "executed, or the thing got resolved one way or another."
+    ),
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "thread_id": {"type": "string", "description": "e.g. 'thread-003'."},
+            "resolution": {"type": "string", "description": "One-line note on how it resolved."},
+        },
+        "required": ["thread_id", "resolution"],
+        "additionalProperties": False,
+    },
+    handler=_close_thread,
+)
+
+
+LIST_THREADS_TOOL = Tool(
+    name="list_threads",
+    description=(
+        "List threads. Filter by status='open' (default), 'closed', or "
+        "'all'. The briefing already surfaces open threads on every "
+        "session start, so usually this isn't needed — call it when "
+        "you want to look at closed history or audit the full list."
+    ),
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "status": {"type": "string", "description": "'open' (default), 'closed', or 'all'."},
+        },
+        "additionalProperties": False,
+    },
+    handler=_list_threads,
+)
+
+
 def register(registry) -> None:
     for t in (NOTE_ABOUT_SELF_TOOL, READ_SELF_MODEL_TOOL,
               NOTE_ABOUT_HUMAN_TOOL, READ_HUMAN_MODEL_TOOL,
-              ADD_CHAPTER_TOOL, READ_NARRATIVE_TOOL):
+              ADD_CHAPTER_TOOL, READ_NARRATIVE_TOOL,
+              OPEN_THREAD_TOOL, CLOSE_THREAD_TOOL, LIST_THREADS_TOOL):
         registry.register(t)

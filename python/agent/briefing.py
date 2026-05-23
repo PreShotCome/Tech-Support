@@ -78,6 +78,17 @@ def compose_briefing(
         parts.append(narrative)
         parts.append("")
 
+    # Open threads — things worth bringing up unprompted.
+    open_threads_block = introspection.render_open_threads_block()
+    if open_threads_block:
+        parts.append("### Open threads (things to bring up unprompted)\n")
+        parts.append(
+            "_Use these to lead with a real question instead of waiting "
+            "to be asked. Close any that have since resolved._\n"
+        )
+        parts.append(open_threads_block)
+        parts.append("")
+
     # Recent transcripts (head + tail of each)
     transcripts = TranscriptLogger.list_transcripts(transcripts_dir)
     if transcripts:
@@ -125,4 +136,8 @@ def briefing_summary_for_human(max_transcripts: int = 3) -> str:
     nar_path = introspection.narrative_path()
     if nar_path.exists():
         parts.append(f"  Narrative:      {nar_path}  ({nar_path.stat().st_size / 1024:.1f} KB)")
+    th_path = introspection.threads_path()
+    if th_path.exists():
+        open_count = len(introspection.list_threads(status="open"))
+        parts.append(f"  Threads:        {th_path}  ({open_count} open)")
     return "\n".join(parts)
