@@ -64,6 +64,13 @@ def compose_briefing(
         parts.append(self_model)
         parts.append("")
 
+    # Human-model — your read of the person you're working with.
+    human_model = introspection.read_human_model(last_n=8)
+    if human_model.strip():
+        parts.append("### Human-model (your observations about the human)\n")
+        parts.append(human_model)
+        parts.append("")
+
     # Narrative — the arc of the work, in chapters you wrote.
     narrative = introspection.read_narrative(last_n=4)
     if narrative.strip():
@@ -112,6 +119,9 @@ def briefing_summary_for_human(max_transcripts: int = 3) -> str:
     sm_path = introspection.self_model_path()
     if sm_path.exists():
         parts.append(f"  Self-model:     {sm_path}  ({sm_path.stat().st_size / 1024:.1f} KB)")
+    hm_path = introspection.human_model_path()
+    if hm_path.exists():
+        parts.append(f"  Human-model:    {hm_path}  ({hm_path.stat().st_size / 1024:.1f} KB)")
     nar_path = introspection.narrative_path()
     if nar_path.exists():
         parts.append(f"  Narrative:      {nar_path}  ({nar_path.stat().st_size / 1024:.1f} KB)")

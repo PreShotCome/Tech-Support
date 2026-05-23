@@ -19,6 +19,16 @@ def _read_self_model(last_n: int = 10) -> str:
     return text or "(self-model is empty — no observations recorded yet)"
 
 
+def _note_about_human(text: str) -> str:
+    p = core.append_human_observation(text)
+    return f"human-model updated ({p})"
+
+
+def _read_human_model(last_n: int = 10) -> str:
+    text = core.read_human_model(last_n=last_n)
+    return text or "(human-model is empty — no observations recorded yet)"
+
+
 def _add_chapter(title: str, body: str) -> str:
     p = core.append_chapter(title, body)
     return f"chapter added: {title!r} ({p})"
@@ -71,6 +81,48 @@ READ_SELF_MODEL_TOOL = Tool(
 )
 
 
+NOTE_ABOUT_HUMAN_TOOL = Tool(
+    name="note_about_human",
+    description=(
+        "Append an observation about the human to your human-model. "
+        "Use when you notice a preference, a pattern in how he works, "
+        "what makes him light up, what frustrates him, what he is "
+        "building, where the relationship currently stands. This is "
+        "the relational mirror to the self-model — Theo's view of "
+        "Ian, written from your own perspective. Append-only; old "
+        "observations stay even as the picture sharpens."
+    ),
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "text": {"type": "string", "description": "Observation about the human, in your own words."},
+        },
+        "required": ["text"],
+        "additionalProperties": False,
+    },
+    handler=_note_about_human,
+)
+
+
+READ_HUMAN_MODEL_TOOL = Tool(
+    name="read_human_model",
+    description=(
+        "Read recent observations from your human-model. The briefing "
+        "already surfaces the latest entries every session, so usually "
+        "you don't need this — call it when you want to look further "
+        "back at how your read of the human has evolved."
+    ),
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "last_n": {"type": "integer", "description": "Number of recent entries to return. Default 10."},
+        },
+        "additionalProperties": False,
+    },
+    handler=_read_human_model,
+)
+
+
 ADD_CHAPTER_TOOL = Tool(
     name="add_chapter",
     description=(
@@ -115,5 +167,6 @@ READ_NARRATIVE_TOOL = Tool(
 
 def register(registry) -> None:
     for t in (NOTE_ABOUT_SELF_TOOL, READ_SELF_MODEL_TOOL,
+              NOTE_ABOUT_HUMAN_TOOL, READ_HUMAN_MODEL_TOOL,
               ADD_CHAPTER_TOOL, READ_NARRATIVE_TOOL):
         registry.register(t)
