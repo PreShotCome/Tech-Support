@@ -164,7 +164,13 @@ class Agent:
             hits = idx.search(query, top_k=self.auto_recall_top_k)
         except Exception:
             return None
-        hits = [h for h in (hits or []) if h.get("score", 0) >= self.auto_recall_min_score]
+        # Gate on raw similarity (relevance), not weighted score — a
+        # heavily-pinned but loosely-related chunk shouldn't leak into
+        # auto-recall just because of its boost.
+        hits = [
+            h for h in (hits or [])
+            if h.get("similarity", h.get("score", 0)) >= self.auto_recall_min_score
+        ]
         if not hits:
             return None
         parts = [

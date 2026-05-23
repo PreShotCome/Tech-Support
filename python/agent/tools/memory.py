@@ -171,7 +171,116 @@ SEMANTIC_RECALL_TOOL = Tool(
 )
 
 
+def _pin_memory(query: str, top_k: int = 3) -> dict:
+    """Pin the top-K chunks matching `query` so they rank higher in
+    future searches. Importance set to +1.0 (max boost, +50%)."""
+    try:
+        from ..embeddings import TranscriptIndex
+    except ImportError as e:
+        return {"error": f"semantic memory unavailable ({e})"}
+    try:
+        idx = TranscriptIndex()
+        modified = idx.set_importance(query, importance=1.0, top_k=top_k)
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+    return {
+        "query": query,
+        "n_pinned": len(modified),
+        "pinned": modified,
+    }
+
+
+def _forget_memory(query: str, top_k: int = 3) -> dict:
+    """Soft-forget the top-K chunks matching `query`. Importance set
+    to -1.0 — they stay in the index (perfect recollection is the rule)
+    but are demoted to 0.5x weight, so they only surface when there's
+    no better match."""
+    try:
+        from ..embeddings import TranscriptIndex
+    except ImportError as e:
+        return {"error": f"semantic memory unavailable ({e})"}
+    try:
+        idx = TranscriptIndex()
+        modified = idx.set_importance(query, importance=-1.0, top_k=top_k)
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+    return {
+        "query": query,
+        "n_demoted": len(modified),
+        "demoted": modified,
+    }
+
+
+def _memory_status() -> dict:
+    try:
+        from ..embeddings import TranscriptIndex
+    except ImportError as e:
+        return {"error": f"semantic memory unavailable ({e})"}
+    try:
+        return TranscriptIndex().status()
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+PIN_MEMORY_TOOL = Tool(
+    name="pin_memory",
+    description=(
+        "Pin past transcript chunks matching `query` so they rank higher "
+        "in future semantic searches (+50% weight). Use when the human "
+        "says something is important to remember, or when a particular "
+        "fact / preference / decision should always surface."
+    ),
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "Natural-language description of what to pin."},
+            "top_k": {"type": "integer", "description": "How many matching chunks to pin. Default 3."},
+        },
+        "required": ["query"],
+        "additionalProperties": False,
+    },
+    handler=_pin_memory,
+)
+
+FORGET_MEMORY_TOOL = Tool(
+    name="forget_memory",
+    description=(
+        "Soft-forget past transcript chunks matching `query` by demoting "
+        "their search weight to 0.5x. The chunks stay in the index — "
+        "this system never actually deletes memory — but they will only "
+        "surface when nothing better matches. Use for noise, dead ends, "
+        "or content the human explicitly wants to deprioritize."
+    ),
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "What to soft-forget."},
+            "top_k": {"type": "integer", "description": "How many matching chunks to demote. Default 3."},
+        },
+        "required": ["query"],
+        "additionalProperties": False,
+    },
+    handler=_forget_memory,
+)
+
+MEMORY_STATUS_TOOL = Tool(
+    name="memory_status",
+    description=(
+        "Summary of the semantic memory index: total chunks, number of "
+        "indexed transcripts, pinned vs soft-forgotten counts, and the "
+        "top 5 most-frequently-recalled chunks (the consolidated ones)."
+    ),
+    parameters_schema={
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False,
+    },
+    handler=_memory_status,
+)
+
+
 def register(registry) -> None:
     for t in (NOTE_TOOL, RECALL_TOOL, SEARCH_TRANSCRIPTS_TOOL,
-              LIST_TRANSCRIPTS_TOOL, SEMANTIC_RECALL_TOOL):
+              LIST_TRANSCRIPTS_TOOL, SEMANTIC_RECALL_TOOL,
+              PIN_MEMORY_TOOL, FORGET_MEMORY_TOOL, MEMORY_STATUS_TOOL):
         registry.register(t)
