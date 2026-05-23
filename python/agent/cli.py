@@ -26,6 +26,7 @@ from .tools import ToolRegistry
 from .tools import trading as trading_tools
 from .tools import memory as memory_tools
 from .tools import system as system_tools
+from .tools import safety as safety_tools
 
 
 def build_agent(backend: str, model: str | None) -> Agent:
@@ -46,6 +47,7 @@ def build_agent(backend: str, model: str | None) -> Agent:
     trading_tools.register(registry)
     memory_tools.register(registry)
     system_tools.register(registry)
+    safety_tools.register(registry)
 
     return Agent(llm=llm, tools=registry)
 
