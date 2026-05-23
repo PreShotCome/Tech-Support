@@ -65,6 +65,15 @@ def main():
     p.add_argument("--horizon", type=int, default=1)
     p.add_argument("--top-k", type=int, default=5,
                    help="Number of stocks to go long each rebalance.")
+    p.add_argument("--bottom-k", type=int, default=None,
+                   help="Stocks to short in longshort mode (defaults to --top-k).")
+    p.add_argument("--mode", choices=["topk", "topk_weighted", "longshort", "ranked"],
+                   default="topk",
+                   help="Portfolio construction: "
+                        "topk=long equal-weight top K; "
+                        "topk_weighted=long top K weighted by P; "
+                        "longshort=long top K + short bottom K (market-neutral); "
+                        "ranked=tilt all symbols by their rank vs basket median.")
     p.add_argument("--top-q", type=float, default=0.2,
                    help="Top quantile of forward returns labelled as +1.")
     p.add_argument("--train-frac", type=float, default=0.70)
@@ -135,10 +144,40 @@ def main():
 
     p_wide = df_te["p"].unstack(level="symbol")
 
-    # Each rebalance: rank symbols, long top K, weight 1/K, flat the rest.
+    # Each rebalance: rank symbols, build portfolio weights per --mode.
     K = args.top_k
+    bK = args.bottom_k or K
     ranks = p_wide.rank(axis=1, ascending=False, method="first")
-    weights = (ranks <= K).astype(float) / K  # equal weight top K
+    asc_ranks = p_wide.rank(axis=1, ascending=True, method="first")
+    n_per_row = p_wide.notna().sum(axis=1)
+
+    if args.mode == "topk":
+        weights = (ranks <= K).astype(float).div(K)
+        strat_name = f"ml_top{K}"
+    elif args.mode == "topk_weighted":
+        is_top = (ranks <= K).astype(float)
+        p_in_top = (p_wide * is_top).fillna(0.0)
+        # Normalize each row so weights sum to 1
+        row_sum = p_in_top.sum(axis=1).replace(0, np.nan)
+        weights = p_in_top.div(row_sum, axis=0).fillna(0.0)
+        strat_name = f"ml_top{K}_pweighted"
+    elif args.mode == "longshort":
+        long_w = (ranks <= K).astype(float).div(K)
+        short_w = (asc_ranks <= bK).astype(float).div(bK)
+        weights = long_w - short_w   # gross exposure = 2.0, net = 0
+        strat_name = f"ml_L{K}S{bK}"
+    elif args.mode == "ranked":
+        # Tilt weight by signed rank-distance from median; normalize so
+        # the long side sums to 1 (matches buy-hold notional exposure).
+        median_rank = (n_per_row + 1) / 2.0
+        tilt = (median_rank.values[:, None] - ranks.values)  # > 0 means above-median
+        tilt = pd.DataFrame(tilt, index=p_wide.index, columns=p_wide.columns)
+        long_side = tilt.clip(lower=0.0)
+        weights = long_side.div(long_side.sum(axis=1).replace(0, np.nan), axis=0).fillna(0.0)
+        strat_name = f"ml_ranked"
+    else:
+        raise ValueError(f"unknown mode {args.mode}")
+
     # Equal-weight benchmark across the same universe each day.
     valid = p_wide.notna().astype(float)
     bench_weights = valid.div(valid.sum(axis=1).replace(0, np.nan), axis=0).fillna(0.0)
@@ -147,7 +186,7 @@ def main():
 
     cfg = BacktestConfig(starting_cash=args.cash, cost=CostModel())
     res_model = run_basket_backtest(test_close, weights, cfg=cfg,
-                                    strategy_name=f"ml_top{K}")
+                                    strategy_name=strat_name)
     res_bench = run_basket_backtest(test_close, bench_weights, cfg=cfg,
                                     strategy_name="equal_weight")
 
