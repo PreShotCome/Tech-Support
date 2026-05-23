@@ -32,6 +32,7 @@ internal static class ConnLog
 public sealed class AgentConnection : IAsyncDisposable
 {
     private readonly TcpClient _client = new();
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
     private NetworkStream? _stream;
     private CancellationTokenSource? _cts;
 
@@ -148,7 +149,21 @@ public sealed class AgentConnection : IAsyncDisposable
     private async Task Send<T>(MessageType type, T msg)
     {
         if (_stream is null) return;
-        await FrameCodec.WriteAsync(_stream, type, JsonMessages.Encode(msg)).ConfigureAwait(false);
+        var payload = JsonMessages.Encode(msg);
+        await _writeLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await FrameCodec.WriteAsync(_stream, type, payload).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            ConnLog.Write($"Send {type} failed: {ex.GetType().Name}: {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
     }
 
     public async ValueTask DisposeAsync()

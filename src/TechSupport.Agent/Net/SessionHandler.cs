@@ -24,6 +24,7 @@ public sealed class SessionHandler : IDisposable
     private readonly AgentOptions _options;
     private readonly ILogger _log;
     private readonly string _remote;
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
     private Session? _session;
 
     public SessionHandler(
@@ -127,15 +128,22 @@ public sealed class SessionHandler : IDisposable
                     frame.TimestampUs, frame.IsKeyFrame, "bgra-raw");
                 var headerJson = JsonMessages.Encode(header);
 
-                await FrameCodec.WriteAsync(stream, MessageType.FrameKey, headerJson, ct)
-                    .ConfigureAwait(false);
-
                 var size = frame.Stride * frame.Height;
                 var buffer = ArrayPool<byte>.Shared.Rent(size);
                 try
                 {
                     Marshal.Copy(frame.Bgra, buffer, 0, size);
-                    await stream.WriteAsync(buffer.AsMemory(0, size), ct).ConfigureAwait(false);
+                    await _writeLock.WaitAsync(ct).ConfigureAwait(false);
+                    try
+                    {
+                        await FrameCodec.WriteAsync(stream, MessageType.FrameKey, headerJson, ct)
+                            .ConfigureAwait(false);
+                        await stream.WriteAsync(buffer.AsMemory(0, size), ct).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        _writeLock.Release();
+                    }
                 }
                 finally
                 {
@@ -155,9 +163,12 @@ public sealed class SessionHandler : IDisposable
 
     private async Task PumpInputAsync(NetworkStream stream, CancellationToken ct)
     {
+        var inputCount = 0;
         while (!ct.IsCancellationRequested)
         {
             var (type, payload) = await FrameCodec.ReadFromStreamAsync(stream, ct).ConfigureAwait(false);
+            if (inputCount++ == 0)
+                _log.LogInformation("First input message received: {Type}", type);
             switch (type)
             {
                 case MessageType.MouseMove:
