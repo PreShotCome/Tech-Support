@@ -60,7 +60,7 @@ public sealed class ConsentBroker
             PipeDirection.InOut,
             maxNumberOfServerInstances: 1,
             PipeTransmissionMode.Byte,
-            PipeOptions.Asynchronous);
+            System.IO.Pipes.PipeOptions.Asynchronous);
 
         using var process = StartPromptProcess(pipeName);
         if (process is null) return false;

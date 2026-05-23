@@ -7,5 +7,5 @@ namespace TechSupport.Console;
 public partial class App : Application
 {
     public static CustomerStore Store { get; } = new();
-    public static MainViewModel Main { get; } = new(Store);
+    public static MainViewModel ViewModel { get; } = new(Store);
 }

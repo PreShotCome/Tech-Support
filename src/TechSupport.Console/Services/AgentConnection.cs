@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.IO;
 using System.IO.Pipelines;
 using System.Net.Sockets;
 using TechSupport.Shared.Protocol;

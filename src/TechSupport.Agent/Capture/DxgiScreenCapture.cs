@@ -79,8 +79,8 @@ public sealed class DxgiScreenCapture : IScreenCapture
 
         var stagingDesc = new Texture2DDescription
         {
-            Width = (uint)Width,
-            Height = (uint)Height,
+            Width = Width,
+            Height = Height,
             MipLevels = 1,
             ArraySize = 1,
             Format = Format.B8G8R8A8_UNorm,
@@ -106,7 +106,7 @@ public sealed class DxgiScreenCapture : IScreenCapture
         if (_frameAcquired) ReleaseFrame();
 
         var hr = _duplication.AcquireNextFrame(
-            (uint)timeoutMs,
+            timeoutMs,
             out _,
             out var resource);
 

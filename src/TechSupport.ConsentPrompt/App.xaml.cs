@@ -24,7 +24,7 @@ public partial class App : Application
         {
             await using var pipe = new NamedPipeClientStream(
                 ".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
-            await pipe.ConnectAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(true);
+            await pipe.ConnectAsync(5000).ConfigureAwait(true);
 
             var reader = System.IO.Pipelines.PipeReader.Create(pipe);
             var (type, payload) = await FrameCodec.ReadAsync(reader).ConfigureAwait(true);

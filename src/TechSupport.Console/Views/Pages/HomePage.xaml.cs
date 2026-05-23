@@ -7,6 +7,6 @@ public partial class HomePage : Page
     public HomePage()
     {
         InitializeComponent();
-        DataContext = App.Main;
+        DataContext = App.ViewModel;
     }
 }

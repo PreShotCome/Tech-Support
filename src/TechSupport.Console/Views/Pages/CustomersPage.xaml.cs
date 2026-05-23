@@ -7,6 +7,6 @@ public partial class CustomersPage : Page
     public CustomersPage()
     {
         InitializeComponent();
-        DataContext = App.Main;
+        DataContext = App.ViewModel;
     }
 }
