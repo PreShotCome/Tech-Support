@@ -21,7 +21,7 @@ class EnvConfig:
     obs_size: tuple[int, int] = (84, 84)        # downsample for the network
     mouse_grid: int = 32                         # 32x32 click targets
     max_steps: int = 1024
-    step_sleep_s: float = 0.1
+    step_sleep_s: float = 1.0                    # 1 Hz default — gentle on CPU
     base_url: str = "http://127.0.0.1:7023"
 
 
