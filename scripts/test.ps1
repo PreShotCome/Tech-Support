@@ -112,6 +112,7 @@ Copy-Item -Path (Join-Path (Split-Path -Parent $consentExe) "*") -Destination $a
 
 Write-Host "Starting agent..."
 $agentProc = Start-Process -FilePath $agentExe -PassThru -WindowStyle Normal `
+    -WorkingDirectory $agentDir `
     -RedirectStandardOutput "$repoRoot\.agent.log" -RedirectStandardError "$repoRoot\.agent.err"
 Write-Host "  agent PID $($agentProc.Id), logs in .agent.log"
 
