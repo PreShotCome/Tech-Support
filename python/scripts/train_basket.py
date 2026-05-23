@@ -35,6 +35,10 @@ DEFAULT_UNIVERSE = [
     "BRK.B", "JPM", "JNJ", "V", "PG", "MA", "HD", "CVX", "ABBV",
     "MRK", "PEP", "KO", "COST", "WMT", "DIS", "BAC", "ADBE",
     "NFLX", "CRM", "AMD", "INTC", "QCOM",
+    # Subversive Capital ETFs that track disclosed Congressional trades.
+    # NANC = Democrats, KRUZ = Republicans. Per the 2024 Unusual Whales
+    # report, NANC returned ~+27% in 2024 vs SPY +25%.
+    "NANC", "KRUZ",
 ]
 
 BARS_PER_YEAR = {
@@ -84,6 +88,9 @@ def main():
     p.add_argument("--market", default="SPY",
                    help="Market reference symbol for beta + relative-strength "
                         "features. Set to empty string to disable.")
+    p.add_argument("--quiver", action="store_true",
+                   help="Add Congressional trade features from Quiver Quant. "
+                        "Requires QUIVER_API_KEY env var.")
     args = p.parse_args()
 
     print(f"Universe: {len(args.symbols)} symbols")
@@ -109,6 +116,24 @@ def main():
         if sym != args.market  # don't include the market in the training universe
     }
     feat_panel = {sym: df for sym, df in feat_panel.items() if not df.empty}
+
+    # Optionally add Congressional-trade features per symbol.
+    if args.quiver:
+        from trading.data.quiver_client import QuiverClient
+        from trading.features.congressional import build_congressional_features
+        client = QuiverClient()
+        if client.enabled:
+            print(f"Quiver: fetching congressional trades for {len(feat_panel)} symbols...")
+            symbols_for_quiver = list(feat_panel.keys())
+            # Use the union of indices so reindex inside the builder is sane
+            union_idx = pd.DatetimeIndex(sorted({ts for df in feat_panel.values() for ts in df.index}))
+            cong = build_congressional_features(symbols_for_quiver, union_idx, client=client)
+            for sym in symbols_for_quiver:
+                if sym in cong:
+                    feat_panel[sym] = feat_panel[sym].join(cong[sym], how="left").fillna(0.0)
+        else:
+            print("Quiver: QUIVER_API_KEY not set; skipping Congressional features.")
+
     long_feats = panel_to_long(feat_panel)
     if long_feats.empty:
         print("No features available after warm-up.")
@@ -121,6 +146,8 @@ def main():
         "atr_pct", "vol_z_30",
         "dd_20", "runup_20", "dist_ma_50", "dist_ma_200",
         "rv_20", "rs_20", "rs_60",
+        "cong_net_30", "cong_net_90", "cong_dollars_30",
+        "cong_dem_net_30", "cong_rep_net_30",
     ]
     # Only rank columns that actually exist (market-relative ones may be absent)
     rank_cols = [c for c in rank_cols if c in long_feats.columns]
