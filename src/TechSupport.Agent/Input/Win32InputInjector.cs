@@ -55,7 +55,10 @@ public sealed class Win32InputInjector : IInputInjector
     public void Button(int x, int y, MouseButton button, bool pressed)
     {
         var (nx, ny) = ToNormalizedAbsolute(x, y);
-        uint flags = MOUSEEVENTF_ABSOLUTE;
+        // MOUSEEVENTF_MOVE is required alongside the button flag, otherwise
+        // SendInput fires the click at the cursor's current location instead
+        // of (x, y).
+        uint flags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE;
         uint mouseData = 0;
 
         switch (button)
@@ -138,7 +141,7 @@ public sealed class Win32InputInjector : IInputInjector
                     dx = nx,
                     dy = ny,
                     mouseData = unchecked((uint)delta),
-                    dwFlags = MOUSEEVENTF_ABSOLUTE |
+                    dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE |
                               (horizontal ? MOUSEEVENTF_HWHEEL : MOUSEEVENTF_WHEEL),
                 }
             }
