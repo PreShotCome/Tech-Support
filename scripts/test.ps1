@@ -71,6 +71,12 @@ if (-not $runtimes -and $Run) {
 Write-Section "Restoring packages"
 & dotnet restore "$repoRoot\TechSupport.sln" | Out-Null
 
+# Kill any previous run before building — otherwise the loaded agent
+# holds bin\...\TechSupport.Shared.dll open and the copy fails.
+if ($Run) {
+    Stop-TestProcesses
+}
+
 Write-Section "Building solution ($Configuration)"
 & dotnet build "$repoRoot\TechSupport.sln" -c $Configuration --nologo
 if ($LASTEXITCODE -ne 0) {
