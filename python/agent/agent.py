@@ -133,6 +133,9 @@ class Agent:
     max_iterations: int = 6
     transcript: list[ChatMessage] = field(default_factory=list)
     logger: Optional[TranscriptLogger] = None
+    auto_recall: bool = True              # inject semantically-relevant past context
+    auto_recall_top_k: int = 4
+    auto_recall_min_score: float = 0.55
 
     def __post_init__(self) -> None:
         if not self.transcript:
@@ -142,7 +145,49 @@ class Agent:
         if self.logger is None:
             self.logger = TranscriptLogger()
 
+    def _recall_context_for(self, query: str) -> str | None:
+        """Semantic search against past transcripts. Returns a markdown
+        block to inject as a system message, or None if nothing relevant,
+        recall is disabled, or fastembed isn't installed.
+
+        This is the auto-recall hook: it runs before every user turn so
+        the model sees past relevant context without having to choose to
+        search. Theo doesn't have to remember to remember."""
+        if not self.auto_recall or not query.strip():
+            return None
+        try:
+            from .embeddings import TranscriptIndex
+        except ImportError:
+            return None
+        try:
+            idx = TranscriptIndex()
+            hits = idx.search(query, top_k=self.auto_recall_top_k)
+        except Exception:
+            return None
+        hits = [h for h in (hits or []) if h.get("score", 0) >= self.auto_recall_min_score]
+        if not hits:
+            return None
+        parts = [
+            "## Relevant context from earlier conversations",
+            "_Auto-surfaced from your own transcripts based on the user's "
+            "last message. Treat as memory you have, not new information._",
+            "",
+        ]
+        for h in hits:
+            parts.append(f"### `{h['source']}` · similarity {h['score']:.2f}")
+            parts.append(h["text"])
+            parts.append("")
+        return "\n".join(parts)
+
     def chat(self, user_input: str) -> str:
+        # Auto-recall: surface semantically-relevant past context BEFORE
+        # the user's turn so the model sees memory without choosing to.
+        recall_block = self._recall_context_for(user_input)
+        if recall_block:
+            self.transcript.append(ChatMessage(role="system", content=recall_block))
+            if self.logger:
+                self.logger.event("note", "auto-recall fired (relevant past context injected)")
+
         self.transcript.append(ChatMessage(role="user", content=user_input))
         if self.logger:
             self.logger.event("user", user_input)
