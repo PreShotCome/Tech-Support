@@ -107,7 +107,11 @@ def main():
             "processed": True,
         })
         doc_ref.update({"processed": True})
-        print(f"  responded to {user_id}: {reply[:80]!r}")
+        print(f"  responded to {user_id}:")
+        print(f"  {'-' * 60}")
+        for line in reply.splitlines() or [""]:
+            print(f"  {line}")
+        print(f"  {'-' * 60}")
 
     # Watch every user's messages collection via collection_group
     # filtered to role=user, processed=false.
@@ -121,7 +125,12 @@ def main():
                 continue
             # Path is conversations/{user_id}/messages/{msg_id}
             user_id = doc.reference.parent.parent.id
-            print(f"New message from {user_id}: {data.get('content', '')[:60]!r}")
+            content = data.get('content', '')
+            print(f"\nNew message from {user_id}:")
+            print(f"{'=' * 60}")
+            for line in content.splitlines() or [""]:
+                print(f"  {line}")
+            print(f"{'=' * 60}")
             handle_message(user_id, doc.reference, data)
 
     query = db.collection_group("messages")
