@@ -56,6 +56,17 @@ class _MainShellState extends State<MainShell> {
     ];
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('TECHSUPPORT'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, size: 20),
+            color: TS.sage,
+            tooltip: 'Sign out',
+            onPressed: () => AuthService.signOut(),
+          ),
+        ],
+      ),
       body: IndexedStack(index: _tab, children: tabs),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
@@ -67,13 +78,6 @@ class _MainShellState extends State<MainShell> {
             label: 'Chat',
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.small(
-        backgroundColor: TS.surfaceAlt,
-        foregroundColor: TS.sage,
-        onPressed: () => AuthService.signOut(),
-        tooltip: 'Sign out',
-        child: const Icon(Icons.logout, size: 18),
       ),
     );
   }
