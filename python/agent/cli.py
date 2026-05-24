@@ -30,6 +30,7 @@ from .tools import safety as safety_tools
 from .tools import identity_tools
 from .tools import web as web_tools
 from .tools import introspection as introspection_tools
+from .tools import osint as osint_tools
 
 
 def build_agent(backend: str, model: str | None) -> Agent:
@@ -54,6 +55,7 @@ def build_agent(backend: str, model: str | None) -> Agent:
     identity_tools.register(registry)
     web_tools.register(registry)
     introspection_tools.register(registry)
+    osint_tools.register(registry)
 
     return Agent(llm=llm, tools=registry)
 

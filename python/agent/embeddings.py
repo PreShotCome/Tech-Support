@@ -48,6 +48,11 @@ DEFAULT_MODEL = "BAAI/bge-small-en-v1.5"
 RECALL_BOOST_PER_HIT = 0.06
 MAX_RECALL_BOOST = 0.60
 
+# Knowledge directories indexed alongside transcripts. Path is resolved
+# relative to the Tech-Support repo root (the parent of `python/`).
+# Each .md file in these dirs becomes searchable via semantic_recall.
+KNOWLEDGE_DIRS = ("docs/research", "docs/skills")
+
 
 def _chunk_text(text: str, max_chars: int = 800, overlap: int = 100) -> list[str]:
     """Split text into overlapping chunks at paragraph boundaries.
@@ -76,6 +81,27 @@ def _chunk_text(text: str, max_chars: int = 800, overlap: int = 100) -> list[str
 def _chunk_id(source: str, index: int, text: str) -> str:
     h = hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]
     return f"{source}::{index}::{h}"
+
+
+def _repo_root() -> Path:
+    """Tech-Support repo root, walking up from this module."""
+    here = Path(__file__).resolve()
+    for parent in [here, *here.parents]:
+        if (parent / "IDENTITY.md").exists() and (parent / "python").exists():
+            return parent
+    # Fallback: assume two levels up (python/agent/embeddings.py -> repo)
+    return here.parent.parent.parent
+
+
+def _knowledge_files() -> list[Path]:
+    """All .md files under KNOWLEDGE_DIRS, sorted for stable ordering."""
+    root = _repo_root()
+    out: list[Path] = []
+    for rel in KNOWLEDGE_DIRS:
+        d = root / rel
+        if d.exists():
+            out.extend(sorted(d.rglob("*.md")))
+    return out
 
 
 @dataclass
@@ -159,18 +185,34 @@ class TranscriptIndex:
     # ------------------------------------------------------------------ build
 
     def reindex(self, transcripts_dir: Optional[Path] = None, force: bool = False) -> dict:
-        """Index any transcripts not yet indexed (or all if force=True)."""
-        paths = TranscriptLogger.list_transcripts(transcripts_dir)
-        new_sources = [p for p in paths if force or p.name not in self._indexed_sources]
+        """Index any transcripts not yet indexed (or all if force=True).
+        Also indexes .md files under KNOWLEDGE_DIRS so curated docs
+        (skills, research notes) live in the same semantic index as
+        chat transcripts."""
         if force:
             self._cache.clear()
             self._indexed_sources.clear()
 
+        # Build the unified list of source files to consider.
+        candidates: list[tuple[Path, str]] = []  # (path, source_key)
+        for p in TranscriptLogger.list_transcripts(transcripts_dir):
+            candidates.append((p, p.name))
+        for p in _knowledge_files():
+            # Source key includes the relative path so files in different
+            # subdirs (osiris/README.md vs trading/README.md) don't collide.
+            try:
+                rel = p.relative_to(_repo_root()).as_posix()
+            except ValueError:
+                rel = p.name
+            candidates.append((p, f"knowledge/{rel}"))
+
         added = 0
         now = time.time()
-        for p in new_sources:
+        for path, source_key in candidates:
+            if not force and source_key in self._indexed_sources:
+                continue
             try:
-                text = p.read_text(encoding="utf-8")
+                text = path.read_text(encoding="utf-8")
             except Exception:
                 continue
             chunks = _chunk_text(text)
@@ -178,16 +220,16 @@ class TranscriptIndex:
                 continue
             vectors = self._embed(chunks)
             for i, (chunk_text, vec) in enumerate(zip(chunks, vectors)):
-                cid = _chunk_id(p.name, i, chunk_text)
+                cid = _chunk_id(source_key, i, chunk_text)
                 self._cache[cid] = EmbeddedChunk(
                     chunk_id=cid,
-                    source=p.name,
+                    source=source_key,
                     text=chunk_text,
                     vector=vec,
                     created_at=now,
                 )
                 added += 1
-            self._indexed_sources.add(p.name)
+            self._indexed_sources.add(source_key)
 
         if added > 0:
             self._save()
