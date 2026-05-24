@@ -12,7 +12,7 @@
 # Override the Firebase key path or project at the launcher's command line:
 #   .\start-theo.ps1 -KeyPath "C:\path\to\key.json" -ProjectId "other-project"
 #   .\start-theo.ps1 -OpenPwa "https://your-app.web.app"   # also open the PWA
-#   .\start-theo.ps1 -WithCli                              # also open a CLI window
+#   .\start-theo.ps1 -NoCli                                # bridge only, skip CLI
 
 param(
     [string]$KeyPath   = $(if ($env:GOOGLE_APPLICATION_CREDENTIALS) { $env:GOOGLE_APPLICATION_CREDENTIALS } else { "C:\Users\Ian\data.json" }),
@@ -20,7 +20,7 @@ param(
     [string]$Backend   = "auto",
     [string]$Model     = "",
     [string]$OpenPwa   = "",        # URL of the deployed PWA; opens in default browser if set
-    [switch]$WithCli                 # also open a terminal CLI window
+    [switch]$NoCli                   # skip the terminal CLI window (bridge only)
 )
 
 $ErrorActionPreference = "Stop"
@@ -47,8 +47,8 @@ Start-Process -FilePath "powershell.exe" `
     -ArgumentList @("-NoExit", "-Command", $bridgeCmd) `
     -WorkingDirectory $repoRoot
 
-# Optionally open a CLI window for terminal chat.
-if ($WithCli) {
+# Open a CLI window for terminal chat (default; pass -NoCli to skip).
+if (-not $NoCli) {
     $cliCmd = "`$Host.UI.RawUI.WindowTitle = 'Theo CLI'; Set-Location '$repoRoot\python'; & '$repoRoot\python\.venv\Scripts\Activate.ps1'; python -m agent.cli"
     Start-Process -FilePath "powershell.exe" `
         -ArgumentList @("-NoExit", "-Command", $cliCmd) `
@@ -62,8 +62,8 @@ if ($OpenPwa) {
 
 Write-Host "Theo is online." -ForegroundColor Green
 Write-Host "  Bridge window:  'Theo bridge' (Ctrl+C in that window to stop)"
-if ($WithCli) { Write-Host "  CLI window:     'Theo CLI'" }
-if ($OpenPwa) { Write-Host "  PWA:            opened in browser" }
+if (-not $NoCli) { Write-Host "  CLI window:     'Theo CLI'" }
+if ($OpenPwa)    { Write-Host "  PWA:            opened in browser" }
 Write-Host ""
 Start-Sleep -Seconds 2   # leave the message visible briefly before the launcher exits
 
