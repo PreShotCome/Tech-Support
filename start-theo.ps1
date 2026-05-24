@@ -39,23 +39,20 @@ Write-Host ""
 
 # Launch the bridge in its own titled window. -NoExit keeps the window
 # open after the bridge starts so you can read logs and Ctrl+C cleanly.
-$bridgeArgs = @(
-    "-NoExit",
-    "-Command",
-    "& { `$Host.UI.RawUI.WindowTitle = 'Theo bridge'; & '$bridgePs1' -KeyPath '$KeyPath' -ProjectId '$ProjectId' -Backend '$Backend'" +
-    $(if ($Model) { " -Model '$Model'" } else { "" }) +
-    " }"
-)
-Start-Process -FilePath "powershell.exe" -ArgumentList $bridgeArgs -WorkingDirectory $repoRoot
+$bridgeCmd = "`$Host.UI.RawUI.WindowTitle = 'Theo bridge'; & '$bridgePs1' -KeyPath '$KeyPath' -ProjectId '$ProjectId' -Backend '$Backend'"
+if ($Model) {
+    $bridgeCmd += " -Model '$Model'"
+}
+Start-Process -FilePath "powershell.exe" `
+    -ArgumentList @("-NoExit", "-Command", $bridgeCmd) `
+    -WorkingDirectory $repoRoot
 
 # Optionally open a CLI window for terminal chat.
 if ($WithCli) {
-    $cliArgs = @(
-        "-NoExit",
-        "-Command",
-        "& { `$Host.UI.RawUI.WindowTitle = 'Theo CLI'; Set-Location '$repoRoot\python'; & '$repoRoot\python\.venv\Scripts\Activate.ps1'; python -m agent.cli }"
-    )
-    Start-Process -FilePath "powershell.exe" -ArgumentList $cliArgs -WorkingDirectory $repoRoot
+    $cliCmd = "`$Host.UI.RawUI.WindowTitle = 'Theo CLI'; Set-Location '$repoRoot\python'; & '$repoRoot\python\.venv\Scripts\Activate.ps1'; python -m agent.cli"
+    Start-Process -FilePath "powershell.exe" `
+        -ArgumentList @("-NoExit", "-Command", $cliCmd) `
+        -WorkingDirectory $repoRoot
 }
 
 # Optionally open the PWA in the default browser.
