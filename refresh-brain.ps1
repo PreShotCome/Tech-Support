@@ -63,9 +63,13 @@ if (-not $NoClean) {
 }
 
 # 3. build
+# --pwa-strategy=none disables the offline-first service worker so
+# deploys reach the browser immediately. Trade-off: no offline support
+# and no install-prompt for fresh PWA installs (existing installed
+# instances on phones keep working).
 Write-Host ""
-Write-Host "[3/4] flutter build web" -ForegroundColor Yellow
-flutter build web
+Write-Host "[3/4] flutter build web --pwa-strategy=none" -ForegroundColor Yellow
+flutter build web --pwa-strategy=none
 if ($LASTEXITCODE -ne 0) { throw "flutter build web failed (exit $LASTEXITCODE)" }
 
 # 4. deploy
