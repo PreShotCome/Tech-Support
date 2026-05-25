@@ -1,34 +1,30 @@
-"""Semantic search over past transcripts using local embeddings.
+"""Semantic search over Theo's memory, backed by LanceDB.
 
-Backed by `fastembed` (BAAI/bge-small-en-v1.5 by default — small ONNX
-model, runs on CPU, no PyTorch dependency, ~100MB).
+This is the upgraded backend — was a single JSON file + linear cosine
+over a dict-cached in memory, now a persistent Lance columnar table
+with proper vector search. Same public API:
 
-Index is a single JSON file mapping chunk_id -> {source, text, vector,
-importance, recall_count, created_at, last_recalled_at}. Build it
-lazily: first query triggers indexing of anything new since the last
-index update.
+    idx = TranscriptIndex()
+    idx.reindex()
+    idx.search(query, top_k=5)
+    idx.set_importance(query, importance=1.0)
+    idx.status()
 
-## Ranking
+What changed:
+  - Storage is `~/.techsupport_agent/embeddings.lance/` (a directory)
+    instead of a single JSON file.
+  - Search runs over LanceDB's vector index (brute-force at our size,
+    auto-ANN once chunks > ~100K).
+  - Auto-migration: on first run after the swap, if the legacy
+    embeddings_index.json exists and the LanceDB table is empty, the
+    old chunks are imported once and forgotten. Old JSON is left in
+    place as a backup.
 
-Default ranking is cosine similarity, multiplied by two weights:
+Weighted ranking (importance + consolidation, no time decay) is still
+the same logic — applied post-search on top-K candidates.
 
-  - **Importance** (-1..+1, default 0.0 = neutral). A pin/forget
-    signal. Mapped to a 0.5..1.5 multiplier so unmarked chunks rank
-    normally (1.0x), pinned chunks (+1.0) get +50%, and soft-forgotten
-    chunks (-1.0) drop to 0.5x. Soft-forgotten chunks are still in the
-    index — they're demoted, not deleted.
-  - **Consolidation** (recall_count). Each time a chunk is returned in
-    a search hit, recall_count increments. The multiplier is
-    1 + min(0.6, recall_count * 0.06), so a chunk recalled 10+ times
-    floats to the top of similar-similarity competitors. Cap is +60%.
-
-There is **no time-based decay**. A conversation from a year ago and
-one from this morning are weighted identically by default. Nothing
-fades. The whole point of this system is perfect recollection — the
-weights only let you say "this one matters more" or "this one keeps
-coming up," not "this one is old, forget it."
-
-Install: `pip install -e .[agent]`"""
+Install: `pip install -e .[agent]` (now also pulls lancedb + pyarrow).
+Reference: docs/research/_REPOS.md cross-references the source library."""
 from __future__ import annotations
 
 import hashlib
@@ -42,22 +38,22 @@ from typing import Optional
 from .transcript_logger import TranscriptLogger
 
 
-INDEX_PATH = Path.home() / ".techsupport_agent" / "embeddings_index.json"
+STATE_DIR = Path.home() / ".techsupport_agent"
+LANCE_PATH = STATE_DIR / "embeddings.lance"
+LEGACY_JSON_PATH = STATE_DIR / "embeddings_index.json"
+
 DEFAULT_MODEL = "BAAI/bge-small-en-v1.5"
+EMBEDDING_DIM = 384   # bge-small-en-v1.5
 
 RECALL_BOOST_PER_HIT = 0.06
 MAX_RECALL_BOOST = 0.60
 
-# Knowledge directories indexed alongside transcripts. Path is resolved
-# relative to the Tech-Support repo root (the parent of `python/`).
-# Each .md file in these dirs becomes searchable via semantic_recall.
 KNOWLEDGE_DIRS = ("docs/research", "docs/skills")
 
 
+# ----------------------------------------------------------- chunking helpers
+
 def _chunk_text(text: str, max_chars: int = 800, overlap: int = 100) -> list[str]:
-    """Split text into overlapping chunks at paragraph boundaries.
-    Embeddings work best on coherent chunks; overlap reduces the chance
-    of cutting a thought in half."""
     paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
     chunks: list[str] = []
     current = ""
@@ -84,17 +80,14 @@ def _chunk_id(source: str, index: int, text: str) -> str:
 
 
 def _repo_root() -> Path:
-    """Tech-Support repo root, walking up from this module."""
     here = Path(__file__).resolve()
     for parent in [here, *here.parents]:
         if (parent / "IDENTITY.md").exists() and (parent / "python").exists():
             return parent
-    # Fallback: assume two levels up (python/agent/embeddings.py -> repo)
     return here.parent.parent.parent
 
 
 def _knowledge_files() -> list[Path]:
-    """All .md files under KNOWLEDGE_DIRS, sorted for stable ordering."""
     root = _repo_root()
     out: list[Path] = []
     for rel in KNOWLEDGE_DIRS:
@@ -106,71 +99,112 @@ def _knowledge_files() -> list[Path]:
 
 @dataclass
 class EmbeddedChunk:
+    """Dataclass used at the API boundary; the storage is LanceDB."""
     chunk_id: str
-    source: str            # transcript filename
+    source: str
     text: str
     vector: list[float]
-    # Weighting fields. All default to neutral so existing chunks loaded
-    # from a pre-weighting index behave like raw cosine ranking.
-    importance: float = 0.0           # -1..+1, pin/forget signal; 0 = neutral
-    recall_count: int = 0             # consolidation counter
-    created_at: float = 0.0           # unix ts; 0 means "unknown / pre-weighting"
-    last_recalled_at: float = 0.0     # unix ts; 0 means "never"
+    importance: float = 0.0
+    recall_count: int = 0
+    created_at: float = 0.0
+    last_recalled_at: float = 0.0
 
+
+# ---------------------------------------------------------------- TranscriptIndex
 
 class TranscriptIndex:
-    def __init__(self, index_path: Path = INDEX_PATH, model: str = DEFAULT_MODEL):
-        self.index_path = index_path
+    """LanceDB-backed semantic memory."""
+
+    TABLE_NAME = "chunks"
+
+    def __init__(self, index_path: Path = LANCE_PATH, model: str = DEFAULT_MODEL):
+        self.index_path = Path(index_path)
         self.model_name = model
         self._embedder = None
-        self._cache: dict[str, EmbeddedChunk] = {}
-        self._indexed_sources: set[str] = set()
-        self._load()
+        self._db = None
+        self._table = None
+        self._open_or_create()
+        self._maybe_migrate_from_json()
 
-    # ------------------------------------------------------------------ persist
+    # ------------------------------------------------------------- LanceDB I/O
 
-    def _load(self) -> None:
-        if not self.index_path.exists():
+    def _open_or_create(self) -> None:
+        import lancedb
+        self.index_path.parent.mkdir(parents=True, exist_ok=True)
+        self._db = lancedb.connect(str(self.index_path))
+        if self.TABLE_NAME in self._db.table_names():
+            self._table = self._db.open_table(self.TABLE_NAME)
+        else:
+            self._table = self._db.create_table(
+                self.TABLE_NAME,
+                schema=self._schema(),
+                mode="create",
+            )
+
+    @staticmethod
+    def _schema():
+        import pyarrow as pa
+        return pa.schema([
+            pa.field("chunk_id",         pa.string()),
+            pa.field("source",           pa.string()),
+            pa.field("text",             pa.string()),
+            pa.field("vector",           pa.list_(pa.float32(), EMBEDDING_DIM)),
+            pa.field("importance",       pa.float32()),
+            pa.field("recall_count",     pa.int64()),
+            pa.field("created_at",       pa.float64()),
+            pa.field("last_recalled_at", pa.float64()),
+        ])
+
+    def _indexed_sources(self) -> set[str]:
+        try:
+            rows = (self._table
+                    .search()
+                    .select(["source"])
+                    .limit(10_000_000)
+                    .to_list())
+        except Exception:
+            return set()
+        return {r["source"] for r in rows}
+
+    def _chunk_id_exists(self, chunk_id: str) -> bool:
+        cnt = self._table.count_rows(f"chunk_id = '{chunk_id}'")
+        return cnt > 0
+
+    # ----------------------------------------------------------- migration
+
+    def _maybe_migrate_from_json(self) -> None:
+        """If LanceDB is empty and the legacy JSON exists, import the old
+        chunks once. Idempotent — checks both file presence and row count."""
+        if self._table.count_rows() > 0:
+            return
+        if not LEGACY_JSON_PATH.exists():
             return
         try:
-            data = json.loads(self.index_path.read_text(encoding="utf-8"))
+            data = json.loads(LEGACY_JSON_PATH.read_text(encoding="utf-8"))
         except Exception:
             return
-        for chunk_id, payload in data.get("chunks", {}).items():
-            self._cache[chunk_id] = EmbeddedChunk(
-                chunk_id=chunk_id,
-                source=payload["source"],
-                text=payload["text"],
-                vector=payload["vector"],
-                importance=float(payload.get("importance", 0.0)),
-                recall_count=int(payload.get("recall_count", 0)),
-                created_at=float(payload.get("created_at", 0.0)),
-                last_recalled_at=float(payload.get("last_recalled_at", 0.0)),
-            )
-            self._indexed_sources.add(payload["source"])
+        chunks = data.get("chunks", {})
+        if not chunks:
+            return
+        rows = []
+        for chunk_id, payload in chunks.items():
+            vec = payload.get("vector") or []
+            if len(vec) != EMBEDDING_DIM:
+                continue
+            rows.append({
+                "chunk_id":         chunk_id,
+                "source":           payload.get("source", ""),
+                "text":             payload.get("text", ""),
+                "vector":           [float(x) for x in vec],
+                "importance":       float(payload.get("importance", 0.0)),
+                "recall_count":     int(payload.get("recall_count", 0)),
+                "created_at":       float(payload.get("created_at", 0.0)),
+                "last_recalled_at": float(payload.get("last_recalled_at", 0.0)),
+            })
+        if rows:
+            self._table.add(rows)
 
-    def _save(self) -> None:
-        self.index_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "model": self.model_name,
-            "chunks": {
-                cid: {
-                    "source": c.source,
-                    "text": c.text,
-                    "vector": c.vector,
-                    "importance": c.importance,
-                    "recall_count": c.recall_count,
-                    "created_at": c.created_at,
-                    "last_recalled_at": c.last_recalled_at,
-                }
-                for cid, c in self._cache.items()
-            },
-        }
-        tmp = self.index_path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(payload), encoding="utf-8")
-        tmp.replace(self.index_path)
-
-    # ------------------------------------------------------------------ embed
+    # --------------------------------------------------------- embedder lazy
 
     def _ensure_embedder(self):
         if self._embedder is None:
@@ -182,35 +216,35 @@ class TranscriptIndex:
         emb = self._ensure_embedder()
         return [list(v) for v in emb.embed(texts)]
 
-    # ------------------------------------------------------------------ build
+    # --------------------------------------------------------------- reindex
 
     def reindex(self, transcripts_dir: Optional[Path] = None, force: bool = False) -> dict:
-        """Index any transcripts not yet indexed (or all if force=True).
-        Also indexes .md files under KNOWLEDGE_DIRS so curated docs
-        (skills, research notes) live in the same semantic index as
-        chat transcripts."""
         if force:
-            self._cache.clear()
-            self._indexed_sources.clear()
+            # Drop and recreate the table
+            self._db.drop_table(self.TABLE_NAME)
+            self._open_or_create()
 
-        # Build the unified list of source files to consider.
-        candidates: list[tuple[Path, str]] = []  # (path, source_key)
+        already = self._indexed_sources()
+
+        candidates: list[tuple[Path, str]] = []
         for p in TranscriptLogger.list_transcripts(transcripts_dir):
             candidates.append((p, p.name))
         for p in _knowledge_files():
-            # Source key includes the relative path so files in different
-            # subdirs (osiris/README.md vs trading/README.md) don't collide.
             try:
                 rel = p.relative_to(_repo_root()).as_posix()
             except ValueError:
                 rel = p.name
             candidates.append((p, f"knowledge/{rel}"))
 
+        new = [(p, s) for p, s in candidates if s not in already]
         added = 0
         now = time.time()
-        for path, source_key in candidates:
-            if not force and source_key in self._indexed_sources:
-                continue
+
+        # Process in batches so embed + insert isn't one huge call
+        BATCH = 32
+        batch_rows: list[dict] = []
+
+        for path, source_key in new:
             try:
                 text = path.read_text(encoding="utf-8")
             except Exception:
@@ -221,29 +255,35 @@ class TranscriptIndex:
             vectors = self._embed(chunks)
             for i, (chunk_text, vec) in enumerate(zip(chunks, vectors)):
                 cid = _chunk_id(source_key, i, chunk_text)
-                self._cache[cid] = EmbeddedChunk(
-                    chunk_id=cid,
-                    source=source_key,
-                    text=chunk_text,
-                    vector=vec,
-                    created_at=now,
-                )
+                batch_rows.append({
+                    "chunk_id":         cid,
+                    "source":           source_key,
+                    "text":             chunk_text,
+                    "vector":           [float(x) for x in vec],
+                    "importance":       0.0,
+                    "recall_count":     0,
+                    "created_at":       now,
+                    "last_recalled_at": 0.0,
+                })
                 added += 1
-            self._indexed_sources.add(source_key)
+                if len(batch_rows) >= BATCH:
+                    self._table.add(batch_rows)
+                    batch_rows = []
 
-        if added > 0:
-            self._save()
+        if batch_rows:
+            self._table.add(batch_rows)
+
         return {
-            "indexed_sources": len(self._indexed_sources),
-            "total_chunks": len(self._cache),
-            "added_this_run": added,
+            "indexed_sources": len(self._indexed_sources()),
+            "total_chunks":    self._table.count_rows(),
+            "added_this_run":  added,
         }
 
-    # ------------------------------------------------------------------ query
+    # ----------------------------------------------------------- search
 
     @staticmethod
     def _importance_mult(importance: float) -> float:
-        imp = max(-1.0, min(1.0, importance))
+        imp = max(-1.0, min(1.0, float(importance)))
         return 1.0 + (imp * 0.5)
 
     @staticmethod
@@ -255,104 +295,123 @@ class TranscriptIndex:
     def search(self, query: str, top_k: int = 5, *, update_recall: bool = True) -> list[dict]:
         if not query.strip():
             return []
+        # Lazy reindex on every search so new files become searchable
         self.reindex()
-        if not self._cache:
+
+        if self._table.count_rows() == 0:
             return []
+
         qvec = self._embed([query])[0]
 
-        scored: list[tuple[float, float, EmbeddedChunk]] = []
-        for c in self._cache.values():
-            sim = self._cosine(qvec, c.vector)
+        # Pull a wider candidate pool so weighted ranking can re-rank
+        candidate_k = max(top_k * 4, 12)
+        try:
+            results = (
+                self._table
+                .search([float(x) for x in qvec])
+                .metric("cosine")
+                .limit(candidate_k)
+                .to_list()
+            )
+        except Exception:
+            return []
+
+        # Compute weighted score; LanceDB's cosine distance = 1 - cosine_similarity
+        scored: list[tuple[float, float, dict]] = []
+        for r in results:
+            sim = 1.0 - float(r.get("_distance", 1.0))
             if sim <= 0:
                 continue
-            imp_mult = self._importance_mult(c.importance)
-            cons_mult = self._consolidation_mult(c.recall_count)
+            imp_mult = self._importance_mult(r.get("importance", 0.0))
+            cons_mult = self._consolidation_mult(int(r.get("recall_count", 0)))
             eff = sim * imp_mult * cons_mult
-            scored.append((eff, sim, c))
+            scored.append((eff, sim, r))
 
         scored.sort(key=lambda t: t[0], reverse=True)
         top = scored[:top_k]
 
         if update_recall and top:
             now = time.time()
-            for _eff, _sim, c in top:
-                c.recall_count += 1
-                c.last_recalled_at = now
-            self._save()
+            for _eff, _sim, r in top:
+                cid = r["chunk_id"].replace("'", "''")
+                try:
+                    self._table.update(
+                        where=f"chunk_id = '{cid}'",
+                        values={
+                            "recall_count": int(r.get("recall_count", 0)) + 1,
+                            "last_recalled_at": now,
+                        },
+                    )
+                except Exception:
+                    pass
 
-        results = []
-        for eff, sim, c in top:
-            results.append({
-                "score": float(eff),
-                "similarity": float(sim),
-                "importance": c.importance,
-                "recall_count": c.recall_count,
-                "source": c.source,
-                "chunk_id": c.chunk_id,
-                "text": c.text,
+        out = []
+        for eff, sim, r in top:
+            out.append({
+                "score":        float(eff),
+                "similarity":   float(sim),
+                "importance":   float(r.get("importance", 0.0)),
+                "recall_count": int(r.get("recall_count", 0)),
+                "source":       r["source"],
+                "chunk_id":     r["chunk_id"],
+                "text":         r["text"],
             })
-        return results
+        return out
 
-    # ------------------------------------------------------------------ pin/forget
+    # ------------------------------------------------------- pin / forget
 
     def set_importance(self, query: str, importance: float, top_k: int = 3) -> list[dict]:
-        """Find chunks matching `query` and set their importance.
-        Returns the list of chunks that were modified.
-
-        importance > 0  → pin (boost). +1.0 is the max boost (+50%).
-        importance < 0  → soft-forget. -1.0 demotes by 50% (0.5x).
-        importance = 0  → neutral.
-        """
         hits = self.search(query, top_k=top_k, update_recall=False)
         if not hits:
             return []
-        modified = []
         imp = max(-1.0, min(1.0, float(importance)))
+        modified = []
         for h in hits:
-            chunk = self._cache.get(h["chunk_id"])
-            if chunk is None:
+            cid = h["chunk_id"].replace("'", "''")
+            try:
+                self._table.update(
+                    where=f"chunk_id = '{cid}'",
+                    values={"importance": imp},
+                )
+            except Exception:
                 continue
-            chunk.importance = imp
             modified.append({
-                "source": chunk.source,
-                "chunk_id": chunk.chunk_id,
-                "text": chunk.text[:200] + ("..." if len(chunk.text) > 200 else ""),
-                "importance": chunk.importance,
+                "source": h["source"],
+                "chunk_id": h["chunk_id"],
+                "text": (h["text"][:200] + ("..." if len(h["text"]) > 200 else "")),
+                "importance": imp,
             })
-        if modified:
-            self._save()
         return modified
 
+    # ---------------------------------------------------------- status
+
     def status(self) -> dict:
-        """Summary of the index: counts, pinned, most-recalled."""
-        chunks = list(self._cache.values())
-        pinned = [c for c in chunks if c.importance > 0]
-        forgotten = [c for c in chunks if c.importance < 0]
-        most_recalled = sorted(chunks, key=lambda c: c.recall_count, reverse=True)[:5]
+        total = self._table.count_rows()
+        pinned = self._table.count_rows("importance > 0")
+        forgotten = self._table.count_rows("importance < 0")
+        try:
+            top_rows = (self._table
+                        .search()
+                        .where("recall_count > 0")
+                        .limit(50)
+                        .to_list())
+            top_rows.sort(key=lambda r: r.get("recall_count", 0), reverse=True)
+            top_rows = top_rows[:5]
+        except Exception:
+            top_rows = []
+
         return {
-            "total_chunks": len(chunks),
-            "indexed_sources": len(self._indexed_sources),
-            "pinned_count": len(pinned),
-            "soft_forgotten_count": len(forgotten),
+            "total_chunks": int(total),
+            "indexed_sources": len(self._indexed_sources()),
+            "pinned_count": int(pinned),
+            "soft_forgotten_count": int(forgotten),
             "top_recalled": [
                 {
-                    "source": c.source,
-                    "recall_count": c.recall_count,
-                    "importance": c.importance,
-                    "preview": c.text[:120] + ("..." if len(c.text) > 120 else ""),
+                    "source": r["source"],
+                    "recall_count": int(r.get("recall_count", 0)),
+                    "importance": float(r.get("importance", 0.0)),
+                    "preview": r["text"][:120] + ("..." if len(r["text"]) > 120 else ""),
                 }
-                for c in most_recalled if c.recall_count > 0
+                for r in top_rows
             ],
         }
-
-    @staticmethod
-    def _cosine(a: list[float], b: list[float]) -> float:
-        import math
-        if not a or not b:
-            return 0.0
-        dot = sum(x * y for x, y in zip(a, b))
-        na = math.sqrt(sum(x * x for x in a))
-        nb = math.sqrt(sum(y * y for y in b))
-        if na == 0 or nb == 0:
-            return 0.0
-        return dot / (na * nb)

@@ -230,20 +230,33 @@ def _stats(brain: dict) -> dict:
     transcripts_dir = STATE_DIR / "transcripts"
     n_transcripts = len(list(transcripts_dir.glob("*.md"))) if transcripts_dir.exists() else 0
 
-    # Memory index chunk count, if the index file is present
-    idx = STATE_DIR / "embeddings_index.json"
+    # Memory index stats — pull from LanceDB via TranscriptIndex.status().
+    # Falls back to the legacy JSON file if LanceDB isn't available
+    # (older venv without the new [agent] deps installed).
     chunks = pinned = recalled = 0
-    if idx.exists():
-        try:
-            data = json.loads(idx.read_text(encoding="utf-8"))
-            chunks = len(data.get("chunks", {}))
-            for c in data.get("chunks", {}).values():
-                if c.get("importance", 0) > 0:
-                    pinned += 1
-                if c.get("recall_count", 0) > 0:
-                    recalled += 1
-        except Exception:
-            pass
+    try:
+        import sys
+        sys.path.insert(0, str(REPO / "python"))
+        from agent.embeddings import TranscriptIndex
+        st = TranscriptIndex().status()
+        chunks = int(st.get("total_chunks", 0))
+        pinned = int(st.get("pinned_count", 0))
+        recalled = sum(
+            1 for r in st.get("top_recalled", []) if r.get("recall_count", 0) > 0
+        )
+    except Exception:
+        legacy = STATE_DIR / "embeddings_index.json"
+        if legacy.exists():
+            try:
+                data = json.loads(legacy.read_text(encoding="utf-8"))
+                chunks = len(data.get("chunks", {}))
+                for c in data.get("chunks", {}).values():
+                    if c.get("importance", 0) > 0:
+                        pinned += 1
+                    if c.get("recall_count", 0) > 0:
+                        recalled += 1
+            except Exception:
+                pass
 
     open_threads = sum(1 for cat in brain["categories"] if cat["id"] == "threads"
                        for n in cat["nodes"] if n.get("open"))
