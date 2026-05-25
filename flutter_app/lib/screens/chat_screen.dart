@@ -2,6 +2,9 @@
 // new user messages with one method call. The bridge process fills in
 // assistant responses asynchronously.
 
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -239,8 +242,10 @@ class _Bubble extends StatelessWidget {
   // and split into a list of text spans + image widgets. Anything that
   // isn't a markdown image is rendered as SelectableText. Images render
   // as Image.network with rounded corners + a soft loading state.
+  // Accepts both http(s) URLs (Pollinations etc.) and data: URIs
+  // (QR codes, embedded SVGs, anything Theo generates inline).
   static final RegExp _imageMd =
-      RegExp(r'!\[([^\]]*)\]\((https?://[^\s\)]+)\)');
+      RegExp(r'!\[([^\]]*)\]\(((?:https?://|data:)[^\s\)]+)\)');
 
   List<Widget> _renderContent(String content, Color fg) {
     final widgets = <Widget>[];
@@ -259,33 +264,7 @@ class _Bubble extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            m.group(2)!,
-            fit: BoxFit.contain,
-            loadingBuilder: (ctx, child, progress) {
-              if (progress == null) return child;
-              return SizedBox(
-                height: 180,
-                child: Center(
-                  child: CircularProgressIndicator(
-                    color: TS.accent,
-                    value: progress.expectedTotalBytes != null
-                        ? progress.cumulativeBytesLoaded /
-                            progress.expectedTotalBytes!
-                        : null,
-                  ),
-                ),
-              );
-            },
-            errorBuilder: (ctx, err, stack) => Container(
-              padding: const EdgeInsets.all(12),
-              color: TS.surfaceAlt,
-              child: Text(
-                'image failed to load',
-                style: TextStyle(color: TS.danger, fontSize: 12),
-              ),
-            ),
-          ),
+          child: _imageFor(m.group(2)!),
         ),
       ));
       cursor = m.end;
@@ -309,6 +288,55 @@ class _Bubble extends StatelessWidget {
     }
     return widgets;
   }
+
+  // Choose Image.network for http(s) URLs and Image.memory for data:
+  // URIs (QR codes, generated SVGs-as-PNG, anything inline base64).
+  // Image.network's data-URI support has been quirky across Flutter
+  // versions and platforms; decoding once on the Dart side is the
+  // safest path that works everywhere.
+  Widget _imageFor(String url) {
+    if (url.startsWith('data:')) {
+      final comma = url.indexOf(',');
+      if (comma < 0) return _imageError('malformed data URL');
+      final payload = url.substring(comma + 1);
+      try {
+        final Uint8List bytes = base64.decode(payload);
+        return Image.memory(
+          bytes,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => _imageError('image failed to load'),
+        );
+      } catch (_) {
+        return _imageError('image failed to decode');
+      }
+    }
+    return Image.network(
+      url,
+      fit: BoxFit.contain,
+      loadingBuilder: (ctx, child, progress) {
+        if (progress == null) return child;
+        return SizedBox(
+          height: 180,
+          child: Center(
+            child: CircularProgressIndicator(
+              color: TS.accent,
+              value: progress.expectedTotalBytes != null
+                  ? progress.cumulativeBytesLoaded /
+                      progress.expectedTotalBytes!
+                  : null,
+            ),
+          ),
+        );
+      },
+      errorBuilder: (_, __, ___) => _imageError('image failed to load'),
+    );
+  }
+
+  Widget _imageError(String msg) => Container(
+        padding: const EdgeInsets.all(12),
+        color: TS.surfaceAlt,
+        child: Text(msg, style: const TextStyle(color: TS.danger, fontSize: 12)),
+      );
 }
 
 class _Composer extends StatelessWidget {
