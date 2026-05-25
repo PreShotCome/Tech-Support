@@ -248,6 +248,66 @@ LIST_THREADS_TOOL = Tool(
 )
 
 
+def _summarize_session(transcript_name: str, title: str, body: str) -> str:
+    """Write a per-session summary tied to a specific transcript filename."""
+    p = core.append_summary(transcript_name, title, body)
+    return f"summary recorded ({p})"
+
+
+def _read_summaries(last_n: int = 15) -> str:
+    text = core.read_summaries(last_n=last_n)
+    return text or "(no summaries recorded yet)"
+
+
+SUMMARIZE_SESSION_TOOL = Tool(
+    name="summarize_session",
+    description=(
+        "Write a compressed digest of a past session so its substance "
+        "stays visible in future briefings without having to load the "
+        "whole transcript. Use when you're wrapping a session (or "
+        "early in the next one when the briefing flags a transcript "
+        "that hasn't been summarized yet). `transcript_name` is the "
+        "transcript's filename (e.g. '2026-05-25-040000.md'). `title` "
+        "is one short line. `body` is 2-5 sentences: what we worked "
+        "on, what was decided, what's next. The briefing surfaces the "
+        "last ~15 summaries every session — that's how old context "
+        "stays reachable as the transcript count grows."
+    ),
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "transcript_name": {
+                "type": "string",
+                "description": "Transcript filename (with or without .md)."
+            },
+            "title": {"type": "string", "description": "Short one-line title."},
+            "body": {"type": "string", "description": "2-5 sentences of substance."},
+        },
+        "required": ["transcript_name", "title", "body"],
+        "additionalProperties": False,
+    },
+    handler=_summarize_session,
+)
+
+
+READ_SUMMARIES_TOOL = Tool(
+    name="read_summaries",
+    description=(
+        "Read recent session summaries. The briefing surfaces the "
+        "latest 15 automatically — call this only when you want to "
+        "look further back at older summaries."
+    ),
+    parameters_schema={
+        "type": "object",
+        "properties": {
+            "last_n": {"type": "integer", "description": "How many recent summaries to return. Default 15."},
+        },
+        "additionalProperties": False,
+    },
+    handler=_read_summaries,
+)
+
+
 def _check_drift(last_n: int = 5) -> dict:
     report = drift_mod.scan_recent(last_n=last_n)
     return report.to_dict()
@@ -280,5 +340,6 @@ def register(registry) -> None:
               NOTE_ABOUT_HUMAN_TOOL, READ_HUMAN_MODEL_TOOL,
               ADD_CHAPTER_TOOL, READ_NARRATIVE_TOOL,
               OPEN_THREAD_TOOL, CLOSE_THREAD_TOOL, LIST_THREADS_TOOL,
+              SUMMARIZE_SESSION_TOOL, READ_SUMMARIES_TOOL,
               CHECK_DRIFT_TOOL):
         registry.register(t)

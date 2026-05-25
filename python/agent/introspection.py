@@ -34,6 +34,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 
 def _state_dir() -> Path:
@@ -246,3 +247,84 @@ def render_open_threads_block() -> str:
     for t in open_:
         lines.append(f"- **{t['thread_id']}** (opened {t['opened']}): {t['body']}")
     return "\n".join(lines)
+
+
+# ----------------------------------------------------------------- summaries
+#
+# Per-session digests. Each entry is keyed by the transcript filename
+# (or just its timestamp prefix) so the briefing can answer "which
+# recent transcript haven't I summarized yet?".
+#
+# Format:
+#     ## <transcript_key> · <title>
+#     <2-5 sentence body>
+
+
+def summaries_path() -> Path:
+    return _state_dir() / "summaries.md"
+
+
+def append_summary(transcript_key: str, title: str, body: str) -> Path:
+    """Add a new session summary. `transcript_key` is the transcript's
+    filename (or its timestamp prefix) so we can join later."""
+    p = summaries_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    key = transcript_key.strip()
+    title = title.strip() or "(untitled)"
+    body = body.strip()
+    with p.open("a", encoding="utf-8") as f:
+        f.write(f"\n## {key} · {title}\n\n{body}\n")
+    return p
+
+
+_SUMMARY_HEADER_RE = _re.compile(
+    r"^##\s+(\S+)\s+·\s+(.+?)\s*$", _re.MULTILINE,
+)
+
+
+def read_summaries(last_n: int = 15, max_chars: int = 6000) -> str:
+    p = summaries_path()
+    if not p.exists():
+        return ""
+    text = p.read_text(encoding="utf-8")
+    blocks = text.split("\n## ")
+    tail = "\n## ".join(blocks[-last_n:]) if blocks else text
+    if len(tail) > max_chars:
+        return "...\n" + tail[-max_chars:]
+    return tail
+
+
+def summarized_transcript_keys() -> set[str]:
+    """Set of transcript keys that already have a summary entry."""
+    p = summaries_path()
+    if not p.exists():
+        return set()
+    try:
+        text = p.read_text(encoding="utf-8")
+    except Exception:
+        return set()
+    return {m.group(1) for m in _SUMMARY_HEADER_RE.finditer(text)}
+
+
+def unsummarized_transcripts(recent_n: int = 5,
+                              transcripts_dir: Optional[Path] = None) -> list[str]:
+    """Filenames of recent transcripts that don't have a summary yet.
+    Always excludes the very newest (current session) — that one isn't
+    finished yet, so don't ask for a summary mid-conversation."""
+    from .transcript_logger import TranscriptLogger
+    paths = TranscriptLogger.list_transcripts(transcripts_dir)
+    if len(paths) <= 1:
+        return []
+    # Drop the most recent (current session in progress)
+    paths = paths[-recent_n - 1: -1]
+    summarized = summarized_transcript_keys()
+    out = []
+    for p in paths:
+        if p.name in summarized:
+            continue
+        # Also accept timestamp prefix as the key (more permissive)
+        stem = p.stem  # without .md
+        if stem in summarized:
+            continue
+        out.append(p.name)
+    return out

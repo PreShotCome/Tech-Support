@@ -79,6 +79,28 @@ def compose_briefing(
         parts.append(narrative)
         parts.append("")
 
+    # Summaries — per-session digests so old context stays reachable
+    # as the transcript file count grows. The compression layer.
+    summaries = introspection.read_summaries(last_n=15)
+    if summaries.strip():
+        parts.append("### Session summaries (compressed history, most recent first)\n")
+        parts.append(summaries)
+        parts.append("")
+
+    # Flag any recent transcripts that don't have a summary yet.
+    # Excludes the current session (in progress).
+    unsummarized = introspection.unsummarized_transcripts(recent_n=5)
+    if unsummarized:
+        parts.append("### Unsummarized recent sessions\n")
+        parts.append(
+            "_These transcripts don't have a summary entry yet. When you "
+            "have a moment, call `summarize_session` on the most relevant "
+            "one so its substance stays visible in future briefings._\n"
+        )
+        for name in unsummarized:
+            parts.append(f"- `{name}`")
+        parts.append("")
+
     # Open threads — things worth bringing up unprompted.
     open_threads_block = introspection.render_open_threads_block()
     if open_threads_block:
@@ -152,4 +174,8 @@ def briefing_summary_for_human(max_transcripts: int = 3) -> str:
     if th_path.exists():
         open_count = len(introspection.list_threads(status="open"))
         parts.append(f"  Threads:        {th_path}  ({open_count} open)")
+    sum_path = introspection.summaries_path()
+    if sum_path.exists():
+        size_kb = sum_path.stat().st_size / 1024
+        parts.append(f"  Summaries:      {sum_path}  ({size_kb:.1f} KB)")
     return "\n".join(parts)
