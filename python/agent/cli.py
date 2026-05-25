@@ -22,25 +22,7 @@ import sys
 from .agent import Agent
 from .llm import ClaudeCliClient, OllamaClient
 from .llm.claude_client import _claude_available
-from .tools import ToolRegistry
-from .tools import trading as trading_tools
-from .tools import memory as memory_tools
-from .tools import system as system_tools
-from .tools import safety as safety_tools
-from .tools import identity_tools
-from .tools import web as web_tools
-from .tools import introspection as introspection_tools
-from .tools import osint as osint_tools
-from .tools import finance as finance_tools
-from .tools import server_metrics as server_metrics_tools
-from .tools import security_tools
-from .tools import browser as browser_tools
-from .tools import skills as skills_tools
-from .tools import d2 as d2_tools
-from .tools import rclone_tool as rclone_tools
-from .tools import chess as chess_tools
-from .tools import croc_tool as croc_tools
-from .tools import image_gen as image_gen_tools
+from .tools._all import build_full_registry
 
 
 def build_agent(backend: str, model: str | None) -> Agent:
@@ -57,26 +39,10 @@ def build_agent(backend: str, model: str | None) -> Agent:
     else:
         raise ValueError(f"unknown backend {backend!r}")
 
-    registry = ToolRegistry()
-    trading_tools.register(registry)
-    memory_tools.register(registry)
-    system_tools.register(registry)
-    safety_tools.register(registry)
-    identity_tools.register(registry)
-    web_tools.register(registry)
-    introspection_tools.register(registry)
-    osint_tools.register(registry)
-    finance_tools.register(registry)
-    server_metrics_tools.register(registry)
-    security_tools.register(registry)
-    browser_tools.register(registry)
-    skills_tools.register(registry)
-    d2_tools.register(registry)
-    rclone_tools.register(registry)
-    chess_tools.register(registry)
-    croc_tools.register(registry)
-    image_gen_tools.register(registry)
-
+    # Single source of truth — see python/agent/tools/_all.py for the
+    # canonical module list. Adding a new tool means editing that one
+    # file; cli + brain dump + tool_info all pick it up automatically.
+    registry = build_full_registry()
     return Agent(llm=llm, tools=registry)
 
 

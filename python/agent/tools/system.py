@@ -22,35 +22,12 @@ def _system_info() -> dict:
 
 
 def _build_full_registry() -> ToolRegistry:
-    """Build a temp registry containing every known tool module so
-    tool_info / list_tools can introspect the full surface even when
-    the live agent has narrowed its loadout via the tool selector."""
-    reg = ToolRegistry()
-    # Lazy imports so loading this module doesn't fan out to all tools
-    # at agent startup.
-    from . import trading as _trading
-    from . import memory as _memory
-    from . import safety as _safety
-    from . import identity_tools as _identity
-    from . import web as _web
-    from . import introspection as _introspection
-    from . import osint as _osint
-    from . import finance as _finance
-    from . import server_metrics as _server_metrics
-    from . import security_tools as _security
-    from . import browser as _browser
-    from . import skills as _skills
-    from . import d2 as _d2
-    from . import rclone_tool as _rclone
-    from . import chess as _chess
-    from . import croc_tool as _croc
-    for mod in (_trading, _memory, _safety, _identity, _web, _introspection,
-                _osint, _finance, _server_metrics, _security, _browser, _skills,
-                _d2, _rclone, _chess, _croc):
-        mod.register(reg)
-    # System tools register last so this module's own tools are present
-    register(reg)
-    return reg
+    """Single source of truth lives in tools/_all.py — see that file
+    for the canonical module list. Keeping a thin wrapper here so
+    tool_info / list_tools have nothing to forget to update when a
+    new tool module lands."""
+    from ._all import build_full_registry as _bfr
+    return _bfr()
 
 
 def _tool_info(name: str) -> dict:

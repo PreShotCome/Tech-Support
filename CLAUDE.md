@@ -101,9 +101,12 @@ That's by design — the bridge architecture moves the agent off-device.
 
 ## When extending
 
-- **New agent tool:** one file in `python/agent/tools/`, register in
-  `python/agent/cli.py`. Schema is JSON Schema, handler is a Python
-  function. See `tools/system.py` for the smallest example.
+- **New agent tool:** one file in `python/agent/tools/` exposing a
+  `register(registry)` function. Then add a single import + entry to
+  `python/agent/tools/_all.py` (the canonical module list). cli.py,
+  scripts/dump_brain.py, and tools/system.py's introspection all read
+  from there — no other edits. Schema is JSON Schema, handler is a
+  Python function. See `tools/system.py` for the smallest example.
 - **New Flutter screen:** one file in `lib/screens/`, add to
   `MainShell`'s `tabs` list or push via `Navigator.push`.
 - **New trading strategy:** subclass `Strategy` in

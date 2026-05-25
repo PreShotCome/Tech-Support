@@ -92,46 +92,12 @@ def _collect_tools() -> list[dict]:
     import sys
     sys.path.insert(0, str(REPO / "python"))
     from agent.tools import ToolRegistry
-    from agent.tools import trading as trading_tools
-    from agent.tools import memory as memory_tools
-    from agent.tools import system as system_tools
-    from agent.tools import safety as safety_tools
-    from agent.tools import identity_tools
-    from agent.tools import web as web_tools
-    from agent.tools import introspection as introspection_tools
-    from agent.tools import osint as osint_tools
-    from agent.tools import finance as finance_tools
-    from agent.tools import server_metrics as server_metrics_tools
-    from agent.tools import security_tools
-    from agent.tools import browser as browser_tools
-    from agent.tools import skills as skills_tools
-    from agent.tools import d2 as d2_tools
-    from agent.tools import rclone_tool as rclone_tools
-    from agent.tools import chess as chess_tools
-    from agent.tools import croc_tool as croc_tools
-    from agent.tools import image_gen as image_gen_tools
+    from agent.tools._all import grouped_modules
 
     reg = ToolRegistry()
-    groups = [
-        ("trading", trading_tools),
-        ("memory", memory_tools),
-        ("system", system_tools),
-        ("safety", safety_tools),
-        ("identity", identity_tools),
-        ("web", web_tools),
-        ("introspection", introspection_tools),
-        ("osint", osint_tools),
-        ("finance", finance_tools),
-        ("server_metrics", server_metrics_tools),
-        ("security", security_tools),
-        ("browser", browser_tools),
-        ("skills", skills_tools),
-        ("diagrams", d2_tools),
-        ("file_sync", rclone_tools),
-        ("chess", chess_tools),
-        ("file_transfer", croc_tools),
-        ("image_gen", image_gen_tools),
-    ]
+    # Single source of truth — see python/agent/tools/_all.py for the
+    # canonical module list and group names.
+    groups = grouped_modules()
     nodes_by_group: dict[str, list[dict]] = {g: [] for g, _ in groups}
     for gname, mod in groups:
         before = set(reg.names())
