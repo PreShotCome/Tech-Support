@@ -47,7 +47,7 @@ class ClaudeCliClient(LlmClient):
         self,
         model: Optional[str] = None,
         executable: str = "claude",
-        timeout: float = 120.0,
+        timeout: float = 300.0,
     ) -> None:
         if not _claude_available():
             raise RuntimeError(
