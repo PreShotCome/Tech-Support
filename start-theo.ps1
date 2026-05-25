@@ -41,24 +41,52 @@ Write-Host "  Project: $ProjectId"
 Write-Host "  Key:     $KeyPath"
 Write-Host ""
 
-# Launch the bridge in its own titled window. -NoExit keeps the window
-# open after the bridge starts so you can read logs and Ctrl+C cleanly.
-$bridgeCmd = "`$Host.UI.RawUI.WindowTitle = 'Theo bridge'; & '$bridgePs1' -KeyPath '$KeyPath' -ProjectId '$ProjectId' -Backend '$Backend'"
-if ($Model) {
-    $bridgeCmd += " -Model '$Model'"
-}
-Start-Process -FilePath "powershell.exe" `
-    -ArgumentList @("-NoExit", "-Command", $bridgeCmd) `
-    -WorkingDirectory $repoRoot
+# Prefer Windows Terminal (`wt`) so bridge + CLI live as tabs in ONE
+# window. Falls back to separate powershell windows when wt isn't
+# installed (older Win10 setups).
+$wt = Get-Command wt -ErrorAction SilentlyContinue
 
-# Open a CLI window for terminal chat (default; pass -NoCli to skip).
-# Symmetric with the bridge launch: call the cli.ps1 script directly so
-# venv activation + python invocation aren't inlined in a fragile string.
-if (-not $NoCli) {
-    $cliCmd = "`$Host.UI.RawUI.WindowTitle = 'Theo CLI'; & '$cliPs1'"
+if ($wt) {
+    # Build a single wt invocation with one tab per surface. The bare
+    # ";" between tabs is wt's command separator. Start-Process with
+    # an array ArgumentList passes each element as its own argv slot,
+    # so the semicolon survives untouched.
+    $wtArgs = @(
+        "new-tab", "--title", "Theo bridge",
+        "-d", $repoRoot,
+        "powershell.exe", "-NoExit", "-File", $bridgePs1,
+        "-KeyPath",   $KeyPath,
+        "-ProjectId", $ProjectId,
+        "-Backend",   $Backend
+    )
+    if ($Model) {
+        $wtArgs += @("-Model", $Model)
+    }
+    if (-not $NoCli) {
+        $wtArgs += @(
+            ";",
+            "new-tab", "--title", "Theo CLI",
+            "-d", $repoRoot,
+            "powershell.exe", "-NoExit", "-File", $cliPs1
+        )
+    }
+    Start-Process -FilePath $wt.Source -ArgumentList $wtArgs
+    Write-Host "  Surface:        Windows Terminal (one window, tabs)"
+} else {
+    # Fallback: separate PowerShell windows, one per surface.
+    $bridgeCmd = "`$Host.UI.RawUI.WindowTitle = 'Theo bridge'; & '$bridgePs1' -KeyPath '$KeyPath' -ProjectId '$ProjectId' -Backend '$Backend'"
+    if ($Model) { $bridgeCmd += " -Model '$Model'" }
     Start-Process -FilePath "powershell.exe" `
-        -ArgumentList @("-NoExit", "-Command", $cliCmd) `
+        -ArgumentList @("-NoExit", "-Command", $bridgeCmd) `
         -WorkingDirectory $repoRoot
+
+    if (-not $NoCli) {
+        $cliCmd = "`$Host.UI.RawUI.WindowTitle = 'Theo CLI'; & '$cliPs1'"
+        Start-Process -FilePath "powershell.exe" `
+            -ArgumentList @("-NoExit", "-Command", $cliCmd) `
+            -WorkingDirectory $repoRoot
+    }
+    Write-Host "  Surface:        separate PowerShell windows (install Windows Terminal for tabs)"
 }
 
 # Optionally open the PWA in the default browser.
