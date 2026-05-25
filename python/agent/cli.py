@@ -40,6 +40,7 @@ from .tools import d2 as d2_tools
 from .tools import rclone_tool as rclone_tools
 from .tools import chess as chess_tools
 from .tools import croc_tool as croc_tools
+from .tools import image_gen as image_gen_tools
 
 
 def build_agent(backend: str, model: str | None) -> Agent:
@@ -74,6 +75,7 @@ def build_agent(backend: str, model: str | None) -> Agent:
     rclone_tools.register(registry)
     chess_tools.register(registry)
     croc_tools.register(registry)
+    image_gen_tools.register(registry)
 
     return Agent(llm=llm, tools=registry)
 

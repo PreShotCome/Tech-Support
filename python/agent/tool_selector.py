@@ -123,6 +123,13 @@ OPTIONAL_CATEGORIES: dict[str, tuple[set[str], str]] = {
         "this file with another machine, croc transfer code, move "
         "data between computers without uploading to cloud first",
     ),
+    "image_gen": (
+        {"generate_image"},
+        "generate an image, draw a picture, create art from a prompt, "
+        "make a visual, render a scene, show me what X looks like, "
+        "produce a photo, illustration, anime, concept art, mood "
+        "image, sketch via Pollinations AI text-to-image",
+    ),
 }
 
 
@@ -187,6 +194,8 @@ _BRAND_KEYWORDS: dict[str, set[str]] = {
     "file_sync":       {"rclone"},
     "chess":           {"stockfish", "chess", "fen", "uci"},
     "file_transfer":   {"croc"},
+    "image_gen":       {"draw", "image of", "picture of", "generate an image",
+                        "pollinations", "text to image", "art of"},
 }
 
 

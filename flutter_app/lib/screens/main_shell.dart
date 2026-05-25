@@ -1,6 +1,8 @@
-// MainShell — post-auth root. Plutus pattern: NavigationBar +
-// IndexedStack. Only one tab today (Chat). Adding tabs later means
-// adding a screen file and one entry below; no router change needed.
+// MainShell — post-auth root. Just the chat screen now; the
+// NavigationBar was dropped once it became clear one tab + a
+// "Chat" label was pure noise. If/when a second screen lands,
+// the navRequest ValueNotifier + IndexedStack pattern from plutus
+// is the path back.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -14,52 +16,12 @@ import '../services/brain_launcher_stub.dart'
     if (dart.library.html) '../services/brain_launcher.dart';
 import 'chat_screen.dart';
 
-class MainShell extends StatefulWidget {
+class MainShell extends StatelessWidget {
   final User user;
   const MainShell({super.key, required this.user});
 
   @override
-  State<MainShell> createState() => _MainShellState();
-}
-
-class _MainShellState extends State<MainShell> {
-  int _tab = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    navRequest.addListener(_onNavRequest);
-  }
-
-  @override
-  void dispose() {
-    navRequest.removeListener(_onNavRequest);
-    super.dispose();
-  }
-
-  void _onNavRequest() {
-    final id = navRequest.value;
-    if (id == null) return;
-    final idx = _tabIndexFor(id);
-    if (idx != null && idx != _tab) setState(() => _tab = idx);
-    navRequest.value = null;
-  }
-
-  int? _tabIndexFor(String id) {
-    switch (id) {
-      case 'chat':
-        return 0;
-      default:
-        return null;
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final tabs = <Widget>[
-      ChatScreen(userId: widget.user.uid),
-    ];
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('TECHSUPPORT'),
@@ -78,18 +40,7 @@ class _MainShellState extends State<MainShell> {
           ),
         ],
       ),
-      body: IndexedStack(index: _tab, children: tabs),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: 'Chat',
-          ),
-        ],
-      ),
+      body: ChatScreen(userId: user.uid),
     );
   }
 }

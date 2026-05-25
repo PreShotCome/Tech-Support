@@ -109,6 +109,7 @@ def _collect_tools() -> list[dict]:
     from agent.tools import rclone_tool as rclone_tools
     from agent.tools import chess as chess_tools
     from agent.tools import croc_tool as croc_tools
+    from agent.tools import image_gen as image_gen_tools
 
     reg = ToolRegistry()
     groups = [
@@ -129,6 +130,7 @@ def _collect_tools() -> list[dict]:
         ("file_sync", rclone_tools),
         ("chess", chess_tools),
         ("file_transfer", croc_tools),
+        ("image_gen", image_gen_tools),
     ]
     nodes_by_group: dict[str, list[dict]] = {g: [] for g, _ in groups}
     for gname, mod in groups:

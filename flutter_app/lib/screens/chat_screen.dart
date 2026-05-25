@@ -219,10 +219,7 @@ class _Bubble extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SelectableText(
-                message.content,
-                style: TextStyle(color: fg, fontSize: 15, height: 1.35),
-              ),
+              ..._renderContent(message.content, fg),
               if (message.createdAt != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
@@ -236,6 +233,81 @@ class _Bubble extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // Parse the message content for markdown image syntax `![alt](url)`
+  // and split into a list of text spans + image widgets. Anything that
+  // isn't a markdown image is rendered as SelectableText. Images render
+  // as Image.network with rounded corners + a soft loading state.
+  static final RegExp _imageMd =
+      RegExp(r'!\[([^\]]*)\]\((https?://[^\s\)]+)\)');
+
+  List<Widget> _renderContent(String content, Color fg) {
+    final widgets = <Widget>[];
+    int cursor = 0;
+    for (final m in _imageMd.allMatches(content)) {
+      if (m.start > cursor) {
+        final chunk = content.substring(cursor, m.start).trim();
+        if (chunk.isNotEmpty) {
+          widgets.add(SelectableText(
+            chunk,
+            style: TextStyle(color: fg, fontSize: 15, height: 1.35),
+          ));
+        }
+      }
+      widgets.add(Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            m.group(2)!,
+            fit: BoxFit.contain,
+            loadingBuilder: (ctx, child, progress) {
+              if (progress == null) return child;
+              return SizedBox(
+                height: 180,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: TS.accent,
+                    value: progress.expectedTotalBytes != null
+                        ? progress.cumulativeBytesLoaded /
+                            progress.expectedTotalBytes!
+                        : null,
+                  ),
+                ),
+              );
+            },
+            errorBuilder: (ctx, err, stack) => Container(
+              padding: const EdgeInsets.all(12),
+              color: TS.surfaceAlt,
+              child: Text(
+                'image failed to load',
+                style: TextStyle(color: TS.danger, fontSize: 12),
+              ),
+            ),
+          ),
+        ),
+      ));
+      cursor = m.end;
+    }
+    if (cursor < content.length) {
+      final tail = content.substring(cursor).trim();
+      if (tail.isNotEmpty) {
+        widgets.add(SelectableText(
+          tail,
+          style: TextStyle(color: fg, fontSize: 15, height: 1.35),
+        ));
+      }
+    }
+    if (widgets.isEmpty) {
+      // Empty content edge-case: render an empty selectable so the
+      // bubble still has a focusable element.
+      widgets.add(SelectableText(
+        content,
+        style: TextStyle(color: fg, fontSize: 15, height: 1.35),
+      ));
+    }
+    return widgets;
   }
 }
 
