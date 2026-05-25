@@ -85,3 +85,6 @@ flutter_app/.packages
 flutter_app/build/
 flutter_app/ios/Pods/
 flutter_app/android/.gradle/
+
+# launcher diagnostic logs
+refresh-brain.log
