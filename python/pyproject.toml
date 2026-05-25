@@ -24,6 +24,7 @@ agent = [
   "lxml>=5.2",
   "lancedb>=0.13",
   "pyarrow>=14.0",
+  "qrcode[pil]>=7.4",
 ]
 firebase = [
   "google-cloud-firestore>=2.18",

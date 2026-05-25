@@ -130,6 +130,17 @@ OPTIONAL_CATEGORIES: dict[str, tuple[set[str], str]] = {
         "produce a photo, illustration, anime, concept art, mood "
         "image, sketch via Pollinations AI text-to-image",
     ),
+    "qr": (
+        {"generate_qr"},
+        "QR code, scan with phone, encode URL as QR, share this link "
+        "as a code, WiFi credentials QR, contact card QR, app deep "
+        "link QR, give me a code to scan",
+    ),
+    "ascii_art": (
+        {"generate_ascii"},
+        "ASCII art, convert image to ASCII, text art, terminal-style "
+        "decoration, monospace picture, fun ASCII conversion",
+    ),
 }
 
 
@@ -196,6 +207,9 @@ _BRAND_KEYWORDS: dict[str, set[str]] = {
     "file_transfer":   {"croc"},
     "image_gen":       {"draw", "image of", "picture of", "generate an image",
                         "pollinations", "text to image", "art of"},
+    "qr":              {"qr code", "qr-code", "qrcode", "scan with my phone",
+                        "scannable code"},
+    "ascii_art":       {"ascii art", "ascii-art", "text art", "ascii-ify"},
 }
 
 

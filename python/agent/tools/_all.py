@@ -43,6 +43,8 @@ def _import_modules():
     from . import chess
     from . import croc_tool
     from . import image_gen
+    from . import qr
+    from . import ascii_art
     return [
         ("trading",         trading),
         ("memory",          memory),
@@ -62,6 +64,8 @@ def _import_modules():
         ("chess",           chess),
         ("file_transfer",   croc_tool),
         ("image_gen",       image_gen),
+        ("qr",              qr),
+        ("ascii",           ascii_art),
     ]
 
 
