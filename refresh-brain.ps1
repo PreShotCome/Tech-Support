@@ -44,7 +44,7 @@ if ($LASTEXITCODE -ne 0) { throw "dump_brain failed (exit $LASTEXITCODE)" }
 
 if ($DumpOnly) {
     Write-Host ""
-    Write-Host "DumpOnly mode — skipping flutter build + firebase deploy." -ForegroundColor Yellow
+    Write-Host "DumpOnly mode - skipping flutter build + firebase deploy." -ForegroundColor Yellow
     Write-Host "brain.json is at $flutterDir\web\brain.json"
     return
 }

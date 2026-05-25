@@ -102,7 +102,7 @@ Write-Host ""
 Start-Sleep -Seconds 2   # leave the message visible briefly before the launcher exits
 
 # -----------------------------------------------------------------------
-# One-time setup — create a desktop shortcut with an icon:
+# One-time setup - create a desktop shortcut with an icon:
 #
 #   1. Right-click start-theo.bat -> "Send to" -> "Desktop (create shortcut)".
 #   2. On the desktop, right-click the new shortcut -> Properties.
