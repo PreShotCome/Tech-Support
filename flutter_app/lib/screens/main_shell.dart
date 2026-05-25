@@ -7,6 +7,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../main.dart';            // TS palette + navRequest
 import '../services/auth_service.dart';
+// Conditional import: dart:html on web, stub elsewhere. Lets the
+// brain button stay buildable on mobile/desktop without pulling a
+// dependency just to open one URL.
+import '../services/brain_launcher_stub.dart'
+    if (dart.library.html) '../services/brain_launcher.dart';
 import 'chat_screen.dart';
 
 class MainShell extends StatefulWidget {
@@ -59,6 +64,12 @@ class _MainShellState extends State<MainShell> {
       appBar: AppBar(
         title: const Text('TECHSUPPORT'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.hub_outlined, size: 20),
+            color: TS.sage,
+            tooltip: 'Brain',
+            onPressed: openBrain,
+          ),
           IconButton(
             icon: const Icon(Icons.logout, size: 20),
             color: TS.sage,
