@@ -202,9 +202,31 @@ class Agent:
         if self.logger:
             self.logger.event("user", user_input)
 
+        # Tool selection by intent — narrow the schema list to relevant
+        # categories so the prompt doesn't carry every tool every turn.
+        # Core tools (memory, identity, web, introspection) are always
+        # in; specialty groups (trading, OSINT, finance, security,
+        # browser, server metrics) come in based on query similarity.
+        try:
+            from .tool_selector import select_schemas
+            selected_schemas, selected_names = select_schemas(
+                user_input, self.tools.schemas(),
+            )
+            if self.logger and len(selected_schemas) < len(self.tools.schemas()):
+                self.logger.event(
+                    "note",
+                    f"tool-selector loaded {len(selected_schemas)} of "
+                    f"{len(self.tools.schemas())} tools: "
+                    f"{', '.join(sorted(selected_names))}",
+                )
+        except Exception:
+            # Selector failure: fall back to all tools so capability
+            # isn't gated by an embedding hiccup.
+            selected_schemas = self.tools.schemas()
+
         final_text = ""
         for _ in range(self.max_iterations):
-            reply = self.llm.chat(self.transcript, tools=self.tools.schemas())
+            reply = self.llm.chat(self.transcript, tools=selected_schemas)
             self.transcript.append(reply)
 
             if not reply.tool_calls:

@@ -42,8 +42,21 @@ STATE_DIR = Path.home() / ".techsupport_agent"
 LANCE_PATH = STATE_DIR / "embeddings.lance"
 LEGACY_JSON_PATH = STATE_DIR / "embeddings_index.json"
 
-DEFAULT_MODEL = "BAAI/bge-small-en-v1.5"
-EMBEDDING_DIM = 384   # bge-small-en-v1.5
+import os as _os
+
+# Allow override via env var. Default is bge-large for better recall;
+# set TECHSUPPORT_EMBED_MODEL=BAAI/bge-small-en-v1.5 to roll back to
+# the lighter model if re-embedding on bge-large takes too long.
+DEFAULT_MODEL = _os.environ.get(
+    "TECHSUPPORT_EMBED_MODEL", "BAAI/bge-large-en-v1.5",
+)
+# Embedding dim is fixed per model; the supported ones we care about:
+_KNOWN_DIMS = {
+    "BAAI/bge-small-en-v1.5": 384,
+    "BAAI/bge-large-en-v1.5": 1024,
+    "BAAI/bge-base-en-v1.5":  768,
+}
+EMBEDDING_DIM = _KNOWN_DIMS.get(DEFAULT_MODEL, 1024)
 
 RECALL_BOOST_PER_HIT = 0.06
 MAX_RECALL_BOOST = 0.60
@@ -138,13 +151,46 @@ class TranscriptIndex:
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
         self._db = lancedb.connect(str(self.index_path))
         if self.TABLE_NAME in self._db.table_names():
-            self._table = self._db.open_table(self.TABLE_NAME)
+            tbl = self._db.open_table(self.TABLE_NAME)
+            # Detect embedding-dim mismatch — happens when the upstream
+            # model changes (e.g. bge-small 384 -> bge-large 1024).
+            # Drop and recreate; reindex() will re-embed everything on
+            # next search.
+            existing_dim = self._stored_vector_dim(tbl)
+            if existing_dim is not None and existing_dim != EMBEDDING_DIM:
+                print(
+                    f"(embedding model changed: stored vectors are "
+                    f"{existing_dim}-dim, current model expects "
+                    f"{EMBEDDING_DIM}; rebuilding index — first search "
+                    f"will re-embed all chunks)"
+                )
+                self._db.drop_table(self.TABLE_NAME)
+                self._table = self._db.create_table(
+                    self.TABLE_NAME, schema=self._schema(), mode="create",
+                )
+                self._fts_ready = False
+            else:
+                self._table = tbl
         else:
             self._table = self._db.create_table(
                 self.TABLE_NAME,
                 schema=self._schema(),
                 mode="create",
             )
+
+    @staticmethod
+    def _stored_vector_dim(tbl) -> int | None:
+        """Best-effort lookup of the existing table's vector dimension."""
+        try:
+            schema = tbl.schema
+            for f in schema:
+                if f.name == "vector":
+                    t = f.type
+                    # Lance stores fixed-size lists; FixedSizeList has list_size
+                    return getattr(t, "list_size", None)
+        except Exception:
+            pass
+        return None
 
     @staticmethod
     def _schema():
