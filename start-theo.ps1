@@ -26,9 +26,13 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $bridgePs1 = Join-Path $repoRoot "bridge.ps1"
+$cliPs1    = Join-Path $repoRoot "cli.ps1"
 
 if (-not (Test-Path $bridgePs1)) {
     throw "bridge.ps1 not found at $bridgePs1"
+}
+if (-not $NoCli -and -not (Test-Path $cliPs1)) {
+    throw "cli.ps1 not found at $cliPs1"
 }
 
 Write-Host ""
@@ -48,8 +52,10 @@ Start-Process -FilePath "powershell.exe" `
     -WorkingDirectory $repoRoot
 
 # Open a CLI window for terminal chat (default; pass -NoCli to skip).
+# Symmetric with the bridge launch: call the cli.ps1 script directly so
+# venv activation + python invocation aren't inlined in a fragile string.
 if (-not $NoCli) {
-    $cliCmd = "`$Host.UI.RawUI.WindowTitle = 'Theo CLI'; Set-Location '$repoRoot\python'; & '$repoRoot\python\.venv\Scripts\Activate.ps1'; python -m agent.cli"
+    $cliCmd = "`$Host.UI.RawUI.WindowTitle = 'Theo CLI'; & '$cliPs1'"
     Start-Process -FilePath "powershell.exe" `
         -ArgumentList @("-NoExit", "-Command", $cliCmd) `
         -WorkingDirectory $repoRoot
