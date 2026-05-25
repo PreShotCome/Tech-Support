@@ -52,7 +52,7 @@ if ($wt) {
     # an array ArgumentList passes each element as its own argv slot,
     # so the semicolon survives untouched.
     $wtArgs = @(
-        "new-tab", "--title", "Theo bridge",
+        "new-tab", "--title", "Bridge",
         "-d", $repoRoot,
         "powershell.exe", "-NoExit", "-File", $bridgePs1,
         "-KeyPath",   $KeyPath,
@@ -65,7 +65,7 @@ if ($wt) {
     if (-not $NoCli) {
         $wtArgs += @(
             ";",
-            "new-tab", "--title", "Theo CLI",
+            "new-tab", "--title", "CLI",
             "-d", $repoRoot,
             "powershell.exe", "-NoExit", "-File", $cliPs1
         )
