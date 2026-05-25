@@ -132,6 +132,19 @@
 - **[d2](./d2/README.md)** — Diagram language. Live via
   `render_diagram` — Theo can sketch architecture / flow / system
   diagrams as SVG/PNG/PDF. Requires the d2 CLI on PATH.
+- **[rclone](./rclone/README.md)** — Cloud file sync. Live via
+  `rclone_op` (listremotes / ls / copy / sync / size / about).
+  Back up Theo's `~/.techsupport_agent/` to cloud, sync transcripts
+  between machines, list bucket contents. Requires the rclone CLI
+  plus configured remotes via `rclone config`.
+- **[Stockfish](./Stockfish/README.md)** — Top open-source chess
+  engine. Live via `chess_analyze` — pass a FEN, get back best move,
+  evaluation, principal variation. Requires the stockfish binary
+  on PATH.
+- **[croc](./croc/README.md)** — Peer-to-peer file transfer. Live
+  via `croc_send` — Theo prepares a file, returns a 3-word transfer
+  code, recipient runs `croc <code>` on the other machine to pull.
+  Requires the croc CLI on PATH.
 - **[OpenBB](https://github.com/OpenBB-finance/OpenBB)** — Live via
   `openbb_query` tool (quotes, historical OHLCV, fundamentals). Uses
   yfinance under the hood — no API key needed for basics. Requires

@@ -37,6 +37,9 @@ from .tools import security_tools
 from .tools import browser as browser_tools
 from .tools import skills as skills_tools
 from .tools import d2 as d2_tools
+from .tools import rclone_tool as rclone_tools
+from .tools import chess as chess_tools
+from .tools import croc_tool as croc_tools
 
 
 def build_agent(backend: str, model: str | None) -> Agent:
@@ -68,6 +71,9 @@ def build_agent(backend: str, model: str | None) -> Agent:
     browser_tools.register(registry)
     skills_tools.register(registry)
     d2_tools.register(registry)
+    rclone_tools.register(registry)
+    chess_tools.register(registry)
+    croc_tools.register(registry)
 
     return Agent(llm=llm, tools=registry)
 

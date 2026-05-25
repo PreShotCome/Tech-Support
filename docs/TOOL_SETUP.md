@@ -107,6 +107,53 @@ from (or use `setx` to make it permanent).
 
 Try: `browser_task task="Go to news.ycombinator.com and tell me the top 3 story titles" headless=true`
 
+## rclone_op — cloud file sync
+
+```powershell
+winget install Rclone.Rclone
+```
+
+Then configure your remotes (one-time setup per cloud provider):
+
+```powershell
+rclone config
+```
+
+Walks you through naming a remote, picking the provider (S3 / Dropbox /
+OneDrive / Google Drive / etc.), and authenticating. Each remote becomes
+addressable as `name:path` in Theo's commands.
+
+Try: `rclone_op operation=listremotes`
+
+## chess_analyze — Stockfish
+
+```powershell
+winget install Stockfish.Stockfish
+```
+
+(Or `brew install stockfish` on macOS, `apt install stockfish` on Linux.)
+
+Try: `chess_analyze fen="startpos" depth=12`
+
+## croc_send — peer-to-peer file transfer
+
+```powershell
+winget install schollz.croc
+```
+
+(Or `brew install croc` on macOS, `apt install croc` on Linux.)
+
+Try: `croc_send path="C:\path\to\file.txt"` — Theo returns a 3-word
+transfer code. Recipient runs `croc <code>` on their machine to pull.
+
+## render_diagram — d2 diagrams
+
+```powershell
+winget install terrastruct.d2
+```
+
+Try: `render_diagram d2_source="A -> B: hello"`
+
 ## When you're not sure if a tool is ready
 
 Theo can probe it himself by calling the tool with a no-op or simple

@@ -105,6 +105,24 @@ OPTIONAL_CATEGORIES: dict[str, tuple[set[str], str]] = {
         "draw a flow chart, visualize data flow, generate a picture "
         "from text via d2 diagram language",
     ),
+    "file_sync": (
+        {"rclone_op"},
+        "back up files to cloud storage, sync directories to S3, "
+        "Dropbox, OneDrive, Google Drive, B2, list cloud bucket "
+        "contents, mirror folders between machines via rclone",
+    ),
+    "chess": (
+        {"chess_analyze"},
+        "chess position analysis, best move, evaluate this FEN, "
+        "Stockfish engine, principal variation, mate in N, who is "
+        "winning, opening preparation, endgame study",
+    ),
+    "file_transfer": (
+        {"croc_send"},
+        "send a file to someone, peer-to-peer file transfer, share "
+        "this file with another machine, croc transfer code, move "
+        "data between computers without uploading to cloud first",
+    ),
 }
 
 
