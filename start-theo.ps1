@@ -9,10 +9,16 @@
 #   - In that window: activates the venv, sets env vars, runs the bridge
 #   - Returns immediately so this launcher process exits cleanly
 #
+# What this also does:
+#   - Runs `git pull` first so you never have to remember to update
+#     the repo. Skips cleanly if the working tree has uncommitted
+#     changes (won't risk a merge conflict).
+#
 # Override the Firebase key path or project at the launcher's command line:
 #   .\start-theo.ps1 -KeyPath "C:\path\to\key.json" -ProjectId "other-project"
 #   .\start-theo.ps1 -OpenPwa "https://your-app.web.app"   # also open the PWA
 #   .\start-theo.ps1 -NoCli                                # bridge only, skip CLI
+#   .\start-theo.ps1 -NoPull                               # skip the git pull step
 
 param(
     [string]$KeyPath   = $(if ($env:GOOGLE_APPLICATION_CREDENTIALS) { $env:GOOGLE_APPLICATION_CREDENTIALS } else { "C:\Users\Ian\data.json" }),
@@ -20,7 +26,8 @@ param(
     [string]$Backend   = "auto",
     [string]$Model     = "",
     [string]$OpenPwa   = "",        # URL of the deployed PWA; opens in default browser if set
-    [switch]$NoCli                   # skip the terminal CLI window (bridge only)
+    [switch]$NoCli,                  # skip the terminal CLI window (bridge only)
+    [switch]$NoPull                  # skip git pull (offline / mid-edit)
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,7 +42,36 @@ if (-not $NoCli -and -not (Test-Path $cliPs1)) {
     throw "cli.ps1 not found at $cliPs1"
 }
 
-Write-Host ""
+# Auto-pull latest changes from origin before launching. Saves the
+# "did I git pull?" question every single time. Skips cleanly with
+# -NoPull if you're offline or mid-edit.
+if (-not $NoPull) {
+    Push-Location $repoRoot
+    try {
+        $git = Get-Command git -ErrorAction SilentlyContinue
+        if (-not $git) {
+            Write-Host "(git not on PATH; skipping pull)" -ForegroundColor DarkGray
+        } else {
+            # If working tree has uncommitted changes, don't risk a
+            # merge conflict — warn and skip.
+            $dirty = (git status --porcelain) | Out-String
+            if ($dirty.Trim()) {
+                Write-Host "(working tree has uncommitted changes; skipping pull to avoid conflicts)" -ForegroundColor Yellow
+                Write-Host "  Use -NoPull next time to silence this, or commit/stash first." -ForegroundColor DarkGray
+            } else {
+                Write-Host "Pulling latest..." -ForegroundColor Cyan
+                git pull --ff-only 2>&1 | ForEach-Object { Write-Host "  $_" }
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Host "(git pull failed; continuing anyway)" -ForegroundColor Yellow
+                }
+            }
+        }
+    } finally {
+        Pop-Location
+    }
+    Write-Host ""
+}
+
 Write-Host "Starting Theo..." -ForegroundColor Cyan
 Write-Host "  Project: $ProjectId"
 Write-Host "  Key:     $KeyPath"
