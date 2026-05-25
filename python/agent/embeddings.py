@@ -48,6 +48,11 @@ EMBEDDING_DIM = 384   # bge-small-en-v1.5
 RECALL_BOOST_PER_HIT = 0.06
 MAX_RECALL_BOOST = 0.60
 
+# Reciprocal Rank Fusion constant. Higher = flatter weight distribution
+# across ranks; 60 is the value the RRF paper uses and most libraries
+# default to. Lower would amplify top-ranked items more aggressively.
+RRF_K = 60
+
 KNOWLEDGE_DIRS = ("docs/research", "docs/skills")
 
 
@@ -170,6 +175,35 @@ class TranscriptIndex:
         cnt = self._table.count_rows(f"chunk_id = '{chunk_id}'")
         return cnt > 0
 
+    # ----------------------------------------------------------- FTS index
+
+    _fts_ready: bool = False
+
+    def _ensure_fts_index(self) -> bool:
+        """Create the full-text index on `text` if missing. Idempotent.
+        Returns True if FTS is usable, False if the table is empty or
+        the create failed."""
+        if self._fts_ready:
+            return True
+        if self._table.count_rows() == 0:
+            return False
+        try:
+            # create_fts_index is safe to call repeatedly; replace=True
+            # in case the schema's drifted under us.
+            self._table.create_fts_index("text", replace=False)
+            self._fts_ready = True
+            return True
+        except Exception:
+            # Some lancedb versions raise if the index already exists;
+            # treat that as success.
+            try:
+                # Probe with a tiny query — if it works, the index is fine
+                self._table.search("test", query_type="fts").limit(1).to_list()
+                self._fts_ready = True
+                return True
+            except Exception:
+                return False
+
     # ----------------------------------------------------------- migration
 
     def _maybe_migrate_from_json(self) -> None:
@@ -220,9 +254,10 @@ class TranscriptIndex:
 
     def reindex(self, transcripts_dir: Optional[Path] = None, force: bool = False) -> dict:
         if force:
-            # Drop and recreate the table
+            # Drop and recreate the table; FTS index is gone too
             self._db.drop_table(self.TABLE_NAME)
             self._open_or_create()
+            self._fts_ready = False
 
         already = self._indexed_sources()
 
@@ -292,7 +327,11 @@ class TranscriptIndex:
             return 1.0
         return 1.0 + min(MAX_RECALL_BOOST, recall_count * RECALL_BOOST_PER_HIT)
 
-    def search(self, query: str, top_k: int = 5, *, update_recall: bool = True) -> list[dict]:
+    def search(self, query: str, top_k: int = 5, *,
+               update_recall: bool = True, hybrid: bool = True) -> list[dict]:
+        """Search the index. Hybrid by default — combines cosine
+        vector search with BM25 full-text search via Reciprocal Rank
+        Fusion. Set hybrid=False for pure vector (skipping FTS)."""
         if not query.strip():
             return []
         # Lazy reindex on every search so new files become searchable
@@ -301,12 +340,12 @@ class TranscriptIndex:
         if self._table.count_rows() == 0:
             return []
 
-        qvec = self._embed([query])[0]
-
-        # Pull a wider candidate pool so weighted ranking can re-rank
         candidate_k = max(top_k * 4, 12)
+
+        # --- vector arm: cosine over embeddings ---
+        qvec = self._embed([query])[0]
         try:
-            results = (
+            vec_results = (
                 self._table
                 .search([float(x) for x in qvec])
                 .metric("cosine")
@@ -314,25 +353,65 @@ class TranscriptIndex:
                 .to_list()
             )
         except Exception:
+            vec_results = []
+
+        # --- fts arm: BM25 over the text field ---
+        fts_results: list[dict] = []
+        if hybrid and self._ensure_fts_index():
+            try:
+                fts_results = (
+                    self._table
+                    .search(query, query_type="fts")
+                    .limit(candidate_k)
+                    .to_list()
+                )
+            except Exception:
+                fts_results = []  # FTS query parse error etc
+
+        # --- combine via Reciprocal Rank Fusion ---
+        # RRF score per doc = sum over rankings of 1 / (RRF_K + rank).
+        # Then we keep raw cosine similarity for inspection and apply
+        # importance + consolidation multipliers on top.
+        merged: dict[str, dict] = {}
+        for rank, r in enumerate(vec_results, start=1):
+            cid = r["chunk_id"]
+            entry = merged.setdefault(cid, {"row": r, "rrf": 0.0,
+                                            "sim": 1.0 - float(r.get("_distance", 1.0)),
+                                            "in_vec": False, "in_fts": False})
+            entry["rrf"] += 1.0 / (RRF_K + rank)
+            entry["in_vec"] = True
+
+        for rank, r in enumerate(fts_results, start=1):
+            cid = r["chunk_id"]
+            entry = merged.setdefault(cid, {"row": r, "rrf": 0.0,
+                                            "sim": 0.0,
+                                            "in_vec": False, "in_fts": False})
+            entry["rrf"] += 1.0 / (RRF_K + rank)
+            entry["in_fts"] = True
+
+        if not merged:
             return []
 
-        # Compute weighted score; LanceDB's cosine distance = 1 - cosine_similarity
-        scored: list[tuple[float, float, dict]] = []
-        for r in results:
-            sim = 1.0 - float(r.get("_distance", 1.0))
-            if sim <= 0:
-                continue
+        # Final score = rrf * importance_mult * consolidation_mult.
+        # Importance/consolidation are tiny multipliers (0.5..1.5x and
+        # up to 1.6x); they nudge ranking among similarly-scored chunks
+        # without overwhelming RRF's signal.
+        scored: list[tuple[float, dict]] = []
+        for cid, entry in merged.items():
+            r = entry["row"]
             imp_mult = self._importance_mult(r.get("importance", 0.0))
             cons_mult = self._consolidation_mult(int(r.get("recall_count", 0)))
-            eff = sim * imp_mult * cons_mult
-            scored.append((eff, sim, r))
+            score = entry["rrf"] * imp_mult * cons_mult
+            entry["final"] = score
+            scored.append((score, entry))
 
         scored.sort(key=lambda t: t[0], reverse=True)
         top = scored[:top_k]
 
         if update_recall and top:
             now = time.time()
-            for _eff, _sim, r in top:
+            for _score, entry in top:
+                r = entry["row"]
                 cid = r["chunk_id"].replace("'", "''")
                 try:
                     self._table.update(
@@ -346,15 +425,19 @@ class TranscriptIndex:
                     pass
 
         out = []
-        for eff, sim, r in top:
+        for score, entry in top:
+            r = entry["row"]
             out.append({
-                "score":        float(eff),
-                "similarity":   float(sim),
-                "importance":   float(r.get("importance", 0.0)),
-                "recall_count": int(r.get("recall_count", 0)),
-                "source":       r["source"],
-                "chunk_id":     r["chunk_id"],
-                "text":         r["text"],
+                "score":         float(score),
+                "similarity":    float(entry["sim"]),  # raw cosine, for auto-recall gating
+                "rrf_score":     float(entry["rrf"]),
+                "matched_via":   ("vec+fts" if (entry["in_vec"] and entry["in_fts"])
+                                  else ("vec" if entry["in_vec"] else "fts")),
+                "importance":    float(r.get("importance", 0.0)),
+                "recall_count":  int(r.get("recall_count", 0)),
+                "source":        r["source"],
+                "chunk_id":      r["chunk_id"],
+                "text":          r["text"],
             })
         return out
 

@@ -161,7 +161,11 @@ class Agent:
             return None
         try:
             idx = TranscriptIndex()
-            hits = idx.search(query, top_k=self.auto_recall_top_k)
+            # Pure vector for auto-recall — "is this semantically
+            # relevant?" is the right test for an automatic per-turn
+            # context injection. Explicit semantic_recall tool calls
+            # use hybrid (cosine + BM25) for richer queries.
+            hits = idx.search(query, top_k=self.auto_recall_top_k, hybrid=False)
         except Exception:
             return None
         # Gate on raw similarity (relevance), not weighted score — a
