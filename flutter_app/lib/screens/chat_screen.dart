@@ -19,11 +19,59 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   late final ChatService _chat = ChatService(widget.userId);
+  // Cache the stream subscription so build() doesn't re-create it on
+  // every rebuild. Re-assigned on app-resume to force re-sync after
+  // the browser/OS suspended JS while the PWA was backgrounded.
+  late Stream<QuerySnapshot<Map<String, dynamic>>> _stream = _chat.stream();
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   bool _sending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _textController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // When the PWA returns from background, re-subscribe to Firestore
+    // so any messages that arrived while suspended show up.
+    if (state == AppLifecycleState.resumed) {
+      setState(() => _stream = _chat.stream());
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _stream = _chat.stream());
+    // Brief delay so the RefreshIndicator animation isn't snappy.
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+  }
+
+  // RefreshIndicator needs a scrollable child to detect pull gestures.
+  // Wrap non-scrollable states (error / loading / empty) so pull-to-refresh
+  // works from every screen, not just when there are messages.
+  Widget _scrollable(Widget child) {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: child,
+        ),
+      ),
+    );
+  }
 
   Future<void> _send() async {
     final text = _textController.text;
@@ -49,44 +97,53 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _chat.stream(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(
-                        'Firestore error: ${snapshot.error}',
-                        style: const TextStyle(color: TS.danger),
-                        textAlign: TextAlign.center,
+            child: RefreshIndicator(
+              color: TS.accent,
+              onRefresh: _refresh,
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: _stream,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return _scrollable(
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            'Firestore error: ${snapshot.error}',
+                            style: const TextStyle(color: TS.danger),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                       ),
-                    ),
-                  );
-                }
-                if (!snapshot.hasData) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: TS.accent),
-                  );
-                }
-                final msgs = snapshot.data!.docs.map(Message.fromDoc).toList();
-                if (msgs.isEmpty) {
-                  return const _EmptyState();
-                }
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_scrollController.hasClients) {
-                    _scrollController.jumpTo(
-                      _scrollController.position.maxScrollExtent,
                     );
                   }
-                });
-                return ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                  itemCount: msgs.length,
-                  itemBuilder: (context, i) => _Bubble(message: msgs[i]),
-                );
-              },
+                  if (!snapshot.hasData) {
+                    return _scrollable(
+                      const Center(
+                        child: CircularProgressIndicator(color: TS.accent),
+                      ),
+                    );
+                  }
+                  final msgs = snapshot.data!.docs.map(Message.fromDoc).toList();
+                  if (msgs.isEmpty) {
+                    return _scrollable(const _EmptyState());
+                  }
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (_scrollController.hasClients) {
+                      _scrollController.jumpTo(
+                        _scrollController.position.maxScrollExtent,
+                      );
+                    }
+                  });
+                  return ListView.builder(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                    itemCount: msgs.length,
+                    itemBuilder: (context, i) => _Bubble(message: msgs[i]),
+                  );
+                },
+              ),
             ),
           ),
           _Composer(
