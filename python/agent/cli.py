@@ -35,6 +35,8 @@ from .tools import finance as finance_tools
 from .tools import server_metrics as server_metrics_tools
 from .tools import security_tools
 from .tools import browser as browser_tools
+from .tools import skills as skills_tools
+from .tools import d2 as d2_tools
 
 
 def build_agent(backend: str, model: str | None) -> Agent:
@@ -64,6 +66,8 @@ def build_agent(backend: str, model: str | None) -> Agent:
     server_metrics_tools.register(registry)
     security_tools.register(registry)
     browser_tools.register(registry)
+    skills_tools.register(registry)
+    d2_tools.register(registry)
 
     return Agent(llm=llm, tools=registry)
 

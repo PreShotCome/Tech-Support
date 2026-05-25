@@ -120,6 +120,18 @@
 - **[osiris](./osiris/_INDEX.md)** — OSINT dashboard. Live via the
   `osint_query` tool — 23 endpoints for earthquakes, fires, flights,
   news, conflict zones, etc.
+- **[claude-plugins-official](./claude-plugins-official/)** — 28
+  SKILL.md instruction docs wired through the `list_skills` and
+  `read_skill` tools. Theo can browse available skills by name +
+  description, then load any one's full body and follow it as
+  operating instructions. Covers: code review, frontend design,
+  MCP server dev, skill creation, plugin dev (commands / agents /
+  hooks / settings / structure), claude-md management, session
+  reporting, math olympiad, plus 6 external integrations
+  (Discord / iMessage / Telegram access + configure).
+- **[d2](./d2/README.md)** — Diagram language. Live via
+  `render_diagram` — Theo can sketch architecture / flow / system
+  diagrams as SVG/PNG/PDF. Requires the d2 CLI on PATH.
 - **[OpenBB](https://github.com/OpenBB-finance/OpenBB)** — Live via
   `openbb_query` tool (quotes, historical OHLCV, fundamentals). Uses
   yfinance under the hood — no API key needed for basics. Requires

@@ -104,6 +104,8 @@ def _collect_tools() -> list[dict]:
     from agent.tools import server_metrics as server_metrics_tools
     from agent.tools import security_tools
     from agent.tools import browser as browser_tools
+    from agent.tools import skills as skills_tools
+    from agent.tools import d2 as d2_tools
 
     reg = ToolRegistry()
     groups = [
@@ -119,6 +121,8 @@ def _collect_tools() -> list[dict]:
         ("server_metrics", server_metrics_tools),
         ("security", security_tools),
         ("browser", browser_tools),
+        ("skills", skills_tools),
+        ("diagrams", d2_tools),
     ]
     nodes_by_group: dict[str, list[dict]] = {g: [] for g, _ in groups}
     for gname, mod in groups:

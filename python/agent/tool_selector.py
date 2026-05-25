@@ -48,6 +48,8 @@ CORE_TOOLS: set[str] = {
     "open_thread", "close_thread", "list_threads",
     "summarize_session", "read_summaries",
     "check_drift",
+    # skills registry — discovering and loading SKILL.md instructions
+    "list_skills", "read_skill",
 }
 
 
@@ -96,6 +98,12 @@ OPTIONAL_CATEGORIES: dict[str, tuple[set[str], str]] = {
         "browse a website, scrape a page, fill out a form, navigate a "
         "JavaScript-heavy site, click links, drive a real browser via "
         "browser-use, automated web flow",
+    ),
+    "diagrams": (
+        {"render_diagram"},
+        "render an architecture diagram, sketch system relationships, "
+        "draw a flow chart, visualize data flow, generate a picture "
+        "from text via d2 diagram language",
     ),
 }
 
