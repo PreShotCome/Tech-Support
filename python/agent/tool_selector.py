@@ -168,6 +168,54 @@ def _ensure_category_vectors(embedder) -> dict[str, list[float]]:
     return out
 
 
+# ------------------------------------------------ explicit-name shortcuts
+#
+# When the query literally names a tool or a known brand from a category,
+# force-include that category regardless of cosine similarity. The
+# embedding selector is best-effort; explicit naming is the strongest
+# signal possible. Theo flagged a bug where a query like "use openbb_query"
+# wasn't loading the openbb category because the cosine wasn't high enough.
+
+_BRAND_KEYWORDS: dict[str, set[str]] = {
+    "trading":         {"alpaca", "portfolio", "rebalance"},
+    "osint":           {"osint", "osiris", "earthquake", "wildfire", "flight tracker"},
+    "finance":         {"openbb", "yfinance", "stock quote", "ticker", "ohlcv"},
+    "server_metrics":  {"netdata", "server metric"},
+    "security_scan":   {"trivy", "crowdsec", "cve scan", "vulnerability scan"},
+    "browser_drive":   {"browser-use", "browser_task"},
+    "diagrams":        {"d2", "render_diagram", "render a diagram"},
+    "file_sync":       {"rclone"},
+    "chess":           {"stockfish", "chess", "fen", "uci"},
+    "file_transfer":   {"croc"},
+}
+
+
+def _all_tool_names() -> dict[str, str]:
+    """Map every known tool name to its category id."""
+    out: dict[str, str] = {}
+    for cat, (tools, _) in OPTIONAL_CATEGORIES.items():
+        for t in tools:
+            out[t] = cat
+    return out
+
+
+def _explicit_matches(query: str) -> set[str]:
+    """Categories the query explicitly invokes by tool name or brand."""
+    q = query.lower()
+    cats: set[str] = set()
+    # 1. Direct tool-name mentions: 'openbb_query', 'osint_query', 'chess_analyze'
+    for tname, cat in _all_tool_names().items():
+        if tname.lower() in q:
+            cats.add(cat)
+    # 2. Brand / domain keywords
+    for cat, kws in _BRAND_KEYWORDS.items():
+        for kw in kws:
+            if kw in q:
+                cats.add(cat)
+                break
+    return cats
+
+
 def _cosine(a: list[float], b: list[float]) -> float:
     if not a or not b:
         return 0.0
@@ -186,12 +234,21 @@ def select_tool_names(query: str,
                        min_sim: float = MIN_SIMILARITY) -> set[str]:
     """Return the set of tool names to expose for this query.
 
-    Always includes CORE_TOOLS. Adds the tools from the top-K optional
-    categories whose similarity to the query crosses min_sim."""
+    Always includes CORE_TOOLS. Force-includes any optional category
+    the query names explicitly (by tool name or brand keyword). Then
+    adds the top-K categories whose embedding similarity to the query
+    crosses min_sim."""
     selected = set(CORE_TOOLS)
     q = (query or "").strip()
     if not q:
         return selected
+
+    # Explicit naming wins over semantic similarity — if Theo or Ian
+    # writes "use openbb_query" we MUST load openbb, regardless of how
+    # the rest of the message scores.
+    for cat in _explicit_matches(q):
+        tools, _ = OPTIONAL_CATEGORIES[cat]
+        selected.update(tools)
 
     embedder = _get_embedder()
     if embedder is None:

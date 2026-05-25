@@ -165,16 +165,26 @@ class Agent:
             # relevant?" is the right test for an automatic per-turn
             # context injection. Explicit semantic_recall tool calls
             # use hybrid (cosine + BM25) for richer queries.
-            hits = idx.search(query, top_k=self.auto_recall_top_k, hybrid=False)
+            # Pull a wider candidate pool than we'll keep so we can
+            # filter out research docs (which would otherwise crowd
+            # out conversation memory given they outnumber transcripts
+            # ~50:1).
+            raw = idx.search(query, top_k=self.auto_recall_top_k * 4, hybrid=False)
         except Exception:
             return None
-        # Gate on raw similarity (relevance), not weighted score — a
-        # heavily-pinned but loosely-related chunk shouldn't leak into
-        # auto-recall just because of its boost.
+        # 1. Drop knowledge/research chunks — those are reference
+        #    material, not memory. Explicit semantic_recall calls can
+        #    still surface them when Theo's deliberately looking up
+        #    docs.
+        conv_only = [h for h in (raw or [])
+                     if not str(h.get("source", "")).startswith("knowledge/")]
+        # 2. Gate on raw similarity (relevance), not weighted score —
+        #    a heavily-pinned but loosely-related chunk shouldn't leak
+        #    into auto-recall just because of its boost.
         hits = [
-            h for h in (hits or [])
+            h for h in conv_only
             if h.get("similarity", h.get("score", 0)) >= self.auto_recall_min_score
-        ]
+        ][: self.auto_recall_top_k]
         if not hits:
             return None
         parts = [
