@@ -32,8 +32,8 @@ from typing import Iterable
 # memory ops, web, and all the introspection tools (self-model, narrative,
 # threads, summaries, drift). These are the spine of every conversation.
 CORE_TOOLS: set[str] = {
-    # system
-    "now", "system_info",
+    # system + self-introspection over the tool registry
+    "now", "system_info", "tool_info", "list_tools",
     # identity
     "set_name", "get_name",
     # memory (always — Theo searches memory on most turns)
