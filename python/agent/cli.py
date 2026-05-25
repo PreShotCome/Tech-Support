@@ -31,6 +31,10 @@ from .tools import identity_tools
 from .tools import web as web_tools
 from .tools import introspection as introspection_tools
 from .tools import osint as osint_tools
+from .tools import finance as finance_tools
+from .tools import server_metrics as server_metrics_tools
+from .tools import security_tools
+from .tools import browser as browser_tools
 
 
 def build_agent(backend: str, model: str | None) -> Agent:
@@ -56,6 +60,10 @@ def build_agent(backend: str, model: str | None) -> Agent:
     web_tools.register(registry)
     introspection_tools.register(registry)
     osint_tools.register(registry)
+    finance_tools.register(registry)
+    server_metrics_tools.register(registry)
+    security_tools.register(registry)
+    browser_tools.register(registry)
 
     return Agent(llm=llm, tools=registry)
 

@@ -100,6 +100,10 @@ def _collect_tools() -> list[dict]:
     from agent.tools import web as web_tools
     from agent.tools import introspection as introspection_tools
     from agent.tools import osint as osint_tools
+    from agent.tools import finance as finance_tools
+    from agent.tools import server_metrics as server_metrics_tools
+    from agent.tools import security_tools
+    from agent.tools import browser as browser_tools
 
     reg = ToolRegistry()
     groups = [
@@ -111,6 +115,10 @@ def _collect_tools() -> list[dict]:
         ("web", web_tools),
         ("introspection", introspection_tools),
         ("osint", osint_tools),
+        ("finance", finance_tools),
+        ("server_metrics", server_metrics_tools),
+        ("security", security_tools),
+        ("browser", browser_tools),
     ]
     nodes_by_group: dict[str, list[dict]] = {g: [] for g, _ in groups}
     for gname, mod in groups:

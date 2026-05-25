@@ -120,3 +120,30 @@
 - **[osiris](./osiris/_INDEX.md)** — OSINT dashboard. Live via the
   `osint_query` tool — 23 endpoints for earthquakes, fires, flights,
   news, conflict zones, etc.
+- **[OpenBB](https://github.com/OpenBB-finance/OpenBB)** — Live via
+  `openbb_query` tool (quotes, historical OHLCV, fundamentals). Uses
+  yfinance under the hood — no API key needed for basics. Requires
+  `pip install openbb`.
+- **[netdata](https://github.com/netdata/netdata)** — Live via
+  `server_metrics` tool. Requires Netdata daemon running locally at
+  `localhost:19999`.
+- **[trivy](https://github.com/aquasecurity/trivy)** — Live via
+  `trivy_scan` tool. Requires `trivy` CLI installed.
+- **[crowdsec](https://github.com/crowdsecurity/crowdsec)** — Live
+  via `crowdsec_check` tool. Auto-selects between local `cscli` and
+  the public CTI API (needs free `CROWDSEC_CTI_KEY` env var for CTI).
+- **[browser-use](https://github.com/browser-use/browser-use)** —
+  Live via `browser_task` tool. Requires `pip install browser-use`,
+  `playwright install chromium`, AND an LLM credential for browser-
+  use's internal reasoning (OPENAI_API_KEY / ANTHROPIC_API_KEY /
+  Ollama). The credential is separate from the Claude CLI Theo uses.
+
+## Future project candidates
+
+- **[supabase](https://github.com/supabase/supabase)** — Flagged for
+  later. The natural Firestore replacement if/when Theo's storage
+  needs grow beyond what Firestore handles well (relational queries,
+  full-text search, row-level security, multi-region replication).
+  Would replace the Firebase Hosting + Firestore + Auth stack with
+  Supabase Hosting + Postgres + Supabase Auth. Migration is real
+  work (~1-2 days) — pick a moment when it actually matters.
