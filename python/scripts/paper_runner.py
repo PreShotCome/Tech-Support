@@ -35,7 +35,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from scripts.train_basket import DEFAULT_UNIVERSE
+from trading.universes import DEFAULT_UNIVERSE
 
 
 PAPER_ENDPOINT_HOST = "paper-api.alpaca.markets"
