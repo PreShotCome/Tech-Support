@@ -62,9 +62,23 @@ if (-not $NoPull) {
                 Write-Host "  Run `git status` to see what's modified. Use -NoPull next time to silence." -ForegroundColor DarkGray
             } else {
                 Write-Host "Pulling latest..." -ForegroundColor Cyan
-                git pull --ff-only 2>&1 | ForEach-Object { Write-Host "  $_" }
-                if ($LASTEXITCODE -ne 0) {
-                    Write-Host "(git pull failed; continuing anyway)" -ForegroundColor Yellow
+                # PowerShell quirk: native commands writing to stderr
+                # trigger NativeCommandError under $ErrorActionPreference
+                # = "Stop" — even with 2>&1. git writes status info to
+                # stderr ("From https://..." etc.). Locally relax error
+                # action around the call so progress output doesn't
+                # halt the whole launcher.
+                $prevPref = $ErrorActionPreference
+                $ErrorActionPreference = "Continue"
+                try {
+                    git pull --ff-only 2>&1 | ForEach-Object { Write-Host "  $_" }
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Host "(git pull exit $LASTEXITCODE; continuing anyway)" -ForegroundColor Yellow
+                    }
+                } catch {
+                    Write-Host "  $_" -ForegroundColor Yellow
+                } finally {
+                    $ErrorActionPreference = $prevPref
                 }
             }
         }
