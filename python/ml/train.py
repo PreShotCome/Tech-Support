@@ -1,18 +1,21 @@
 """Train theo_net on a set of symbols.
 
-    python -m ml.train --symbols AAPL,MSFT,NVDA --epochs 20
+    python -m ml.train --symbols AAPL,MSFT,NVDA --epochs 50 --patience 7
 
 For each (symbol, day) pair we:
   1. Build the 6 features as of that day.
   2. Label = 1 if the symbol's next-5-day return > SPY's next-5-day
      return, else 0.
 
-80/20 train/test split (random). Adam + BCE. Checkpoint saved to
-python/ml/checkpoints/theo_net.pt.
+80/20 train/test split (random). Adam + BCE.
+Best checkpoint (lowest test loss) saved to python/ml/checkpoints/theo_net.pt.
+Early stopping halts training after `patience` epochs with no test-loss improvement.
 """
 from __future__ import annotations
 
 import argparse
+import copy
+import math
 import random
 from datetime import date as _date, timedelta
 from pathlib import Path
@@ -20,6 +23,12 @@ from pathlib import Path
 
 CHECKPOINT_DIR = Path(__file__).resolve().parent / "checkpoints"
 CHECKPOINT_PATH = CHECKPOINT_DIR / "theo_net.pt"
+
+DEFAULT_SYMBOLS = (
+    "AAPL,MSFT,NVDA,GOOGL,META,AMZN,TSLA,AMD,AVGO,CRM,"
+    "ADBE,NFLX,ORCL,QCOM,CSCO,PYPL,SHOP,UBER,SQ,COIN,"
+    "PLTR,SNOW,DDOG,NET,MDB,CRWD,ZS,OKTA,ARM,MRVL"
+)
 
 
 def _build_dataset(symbols: list[str], lookback_days: int = 365):
@@ -59,7 +68,6 @@ def _build_dataset(symbols: list[str], lookback_days: int = 365):
                 feats = build_features(symbol, asof_date=asof)
             except Exception:
                 continue
-            # Label: next-5d return vs SPY next-5d return
             ret = (closes[i + 5] / closes[i]) - 1.0
             spy_then = spy_closes_by_date.get(asof)
             spy_future = spy_closes_by_date.get(dates[i + 5])
@@ -75,7 +83,13 @@ def _build_dataset(symbols: list[str], lookback_days: int = 365):
     return torch.tensor(X, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
 
 
-def train(symbols: list[str], epochs: int = 20, lr: float = 1e-3, seed: int = 0) -> dict:
+def train(
+    symbols: list[str],
+    epochs: int = 50,
+    lr: float = 1e-3,
+    seed: int = 0,
+    patience: int = 7,
+) -> dict:
     import torch
     from .theo_net import TheoNet
 
@@ -95,6 +109,11 @@ def train(symbols: list[str], epochs: int = 20, lr: float = 1e-3, seed: int = 0)
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = torch.nn.BCELoss()
 
+    best_loss = math.inf
+    best_state = copy.deepcopy(model.state_dict())
+    no_improve = 0
+    stopped_at = epochs
+
     for epoch in range(epochs):
         model.train()
         opt.zero_grad()
@@ -103,44 +122,77 @@ def train(symbols: list[str], epochs: int = 20, lr: float = 1e-3, seed: int = 0)
         loss.backward()
         opt.step()
 
-        if (epoch + 1) % max(1, epochs // 10) == 0 or epoch == 0:
-            model.eval()
-            with torch.no_grad():
-                te_preds = model(X_te) if len(X_te) > 0 else preds
-                if len(X_te) > 0:
-                    te_loss = loss_fn(te_preds, y_te).item()
-                    te_acc = ((te_preds > 0.5).float() == y_te).float().mean().item()
-                else:
-                    te_loss, te_acc = float("nan"), float("nan")
-            print(f"epoch {epoch+1:3d}/{epochs}  train_loss={loss.item():.4f}  "
-                  f"test_loss={te_loss:.4f}  test_acc={te_acc:.3f}")
+        model.eval()
+        with torch.no_grad():
+            if len(X_te) > 0:
+                te_preds = model(X_te)
+                te_loss = loss_fn(te_preds, y_te).item()
+                te_acc = ((te_preds > 0.5).float() == y_te).float().mean().item()
+            else:
+                te_loss, te_acc = float("nan"), float("nan")
 
+        log_every = max(1, epochs // 10)
+        if (epoch + 1) % log_every == 0 or epoch == 0:
+            print(
+                f"epoch {epoch+1:3d}/{epochs}  "
+                f"train_loss={loss.item():.4f}  "
+                f"test_loss={te_loss:.4f}  "
+                f"test_acc={te_acc:.3f}"
+            )
+
+        if te_loss < best_loss:
+            best_loss = te_loss
+            best_state = copy.deepcopy(model.state_dict())
+            no_improve = 0
+        else:
+            no_improve += 1
+            if patience > 0 and no_improve >= patience:
+                print(f"early stop at epoch {epoch+1} (no improvement for {patience} epochs)")
+                stopped_at = epoch + 1
+                break
+
+    model.load_state_dict(best_state)
     CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
-    torch.save({
-        "state_dict": model.state_dict(),
-        "symbols":    symbols,
-        "epochs":     epochs,
-        "n_train":    len(train_idx),
-        "n_test":     len(test_idx),
-    }, CHECKPOINT_PATH)
-    print(f"saved checkpoint to {CHECKPOINT_PATH}")
+    torch.save(
+        {
+            "state_dict": best_state,
+            "symbols": symbols,
+            "epochs_run": stopped_at,
+            "best_test_loss": best_loss,
+            "n_train": len(train_idx),
+            "n_test": len(test_idx),
+        },
+        CHECKPOINT_PATH,
+    )
+    print(f"saved best checkpoint (test_loss={best_loss:.4f}) to {CHECKPOINT_PATH}")
     return {
         "checkpoint": str(CHECKPOINT_PATH),
-        "n_train":    len(train_idx),
-        "n_test":     len(test_idx),
+        "epochs_run": stopped_at,
+        "best_test_loss": best_loss,
+        "n_train": len(train_idx),
+        "n_test": len(test_idx),
     }
 
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--symbols", default="AAPL,MSFT,NVDA,GOOGL,AMZN",
-                   help="Comma-separated ticker list.")
-    p.add_argument("--epochs", type=int, default=20)
+    p.add_argument(
+        "--symbols",
+        default=DEFAULT_SYMBOLS,
+        help="Comma-separated ticker list (default: 30 large-cap tech/growth names).",
+    )
+    p.add_argument("--epochs", type=int, default=50)
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument(
+        "--patience",
+        type=int,
+        default=7,
+        help="Early-stop after this many epochs with no test-loss improvement. 0 = disabled.",
+    )
     args = p.parse_args()
     symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
-    train(symbols, epochs=args.epochs, lr=args.lr, seed=args.seed)
+    train(symbols, epochs=args.epochs, lr=args.lr, seed=args.seed, patience=args.patience)
 
 
 if __name__ == "__main__":
