@@ -35,6 +35,23 @@ import asyncio
 import sys
 from typing import Any
 
+# PyAudio shim — on Windows + Python 3.14, the standard pyaudio
+# package has no prebuilt wheel and needs PortAudio C headers to
+# compile from source. PyAudioWPatch ships pre-built with PortAudio
+# bundled, but it installs as `pyaudiowpatch`. Pipecat hardcodes
+# `import pyaudio`, so we pre-populate sys.modules so its import
+# resolves to PyAudioWPatch transparently. Only triggers when
+# regular pyaudio isn't available; harmless otherwise.
+try:
+    import pyaudio  # noqa: F401
+except ImportError:
+    try:
+        import pyaudiowpatch as _pyaudio_shim
+        sys.modules["pyaudio"] = _pyaudio_shim
+    except ImportError:
+        # Both unavailable — let pipecat raise its own clear error
+        pass
+
 # Pipecat 1.2.1 imports. If any of these paths shift in a later
 # pipecat release the error will be clear enough to fix here without
 # rewriting the architecture.
