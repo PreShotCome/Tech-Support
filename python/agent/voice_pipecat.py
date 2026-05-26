@@ -143,13 +143,17 @@ async def _run(args):
     )
 
     stt = WhisperSTTService(
-        model=args.whisper_model,
+        settings=WhisperSTTService.Settings(
+            model=args.whisper_model,
+            no_speech_prob=0.4,
+        ),
         device="cpu",
-        no_speech_prob=0.4,
     )
 
     tts = PiperTTSService(
-        voice=args.voice,
+        settings=PiperTTSService.Settings(
+            voice=args.voice,
+        ),
     )
 
     theo = TheoAgentService(agent)
