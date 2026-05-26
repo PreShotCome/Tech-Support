@@ -1,13 +1,14 @@
-# Bot Playbook — durable memory across sessions
+# Proteus Playbook — durable memory across sessions
 
 > Before reading this, read **`/IDENTITY.md`** at the repo root. That
 > document is the design intent — who the system is and how it grows.
-> This playbook is the *operational* record: what we've tried, what
-> works, what doesn't. Identity first, then operations.
+> This playbook is the *operational* record for Proteus (the trading
+> bot): what we've tried, what works, what doesn't. Identity first,
+> then operations.
 
-This file is the trading bot's institutional memory. Read it before you
-extend the strategy. Every "obvious" idea below has already been tested
-on this codebase and the result is recorded here so we don't redo work.
+This file is Proteus's institutional memory. Read it before you extend
+the strategy. Every "obvious" idea below has already been tested on
+this codebase and the result is recorded here so we don't redo work.
 
 Last updated: 2026-05-23.
 

@@ -129,8 +129,8 @@ agent on the next CLI start.
   uses your existing CLI auth (Max subscription) and incurs no
   per-token charges.
 - Not a replacement for Claude Code itself. Claude Code is the
-  developer-facing tool; this is a domain-specific agent with your
-  trading bot wired in.
+  developer-facing tool; Theo is a domain-specific agent with Proteus
+  (the trading bot) wired in.
 - Not autonomous. The agent never does anything on its own — it only
   responds to your turns. To run things on a schedule, use Task
   Scheduler against `paper_runner` / `paper_shadow` as before.

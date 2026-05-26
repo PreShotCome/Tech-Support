@@ -10,11 +10,11 @@ Requires `openbb` installed in the venv:
 
 Reference docs: docs/research/OpenBB/
 
-Background: the Tech-Support trading bot is an equal-weight basket
-of megacaps on Alpaca paper. OpenBB is the natural data source when
-Theo needs richer info than the existing market_clock / portfolio
-tools provide — fundamentals, sector breakdowns, alternate prices,
-macro context."""
+Background: Proteus (the trading bot) is an equal-weight basket of
+megacaps on Alpaca paper. OpenBB is the natural data source when
+Theo needs richer info on a Proteus question than the existing
+market_clock / portfolio tools provide — fundamentals, sector
+breakdowns, alternate prices, macro context."""
 from __future__ import annotations
 
 from typing import Any

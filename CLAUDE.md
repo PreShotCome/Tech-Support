@@ -3,6 +3,20 @@
 > Read this first when starting work in this repo. Conventions, layout,
 > and the load-bearing documents are below.
 
+## Project namespace
+
+Ian's projects share a Greek-mythology naming convention. When Theo
+references any of these, use the proper name:
+
+| Name | What it is | Repo |
+|---|---|---|
+| **Theo** | The agent itself — long-term thinking partner | preshotcome/tech-support (this repo) |
+| **Proteus** | The trading bot | this repo, `python/trading/` + `python/scripts/` |
+| **Plutus** | Personal budget app | preshotcome/plutus-app + preshotcome/plutus-backend |
+| **Metis** | Reminder app | (separate repo) |
+| **Soteria** | Backup-verification SaaS | preshotcome/anything |
+| **Hestia** | (separate concern) | preshotcome/hestia |
+
 ## What this is
 
 A long-term thinking partner for Ian, built around four interlocking
@@ -11,14 +25,14 @@ systems:
 1. **Identity** — `/IDENTITY.md` is the canonical design document. The
    model that runs the system changes over years; this file is what
    persists. Read it at the start of every session.
-2. **Trading bot** — `python/trading/` + `python/scripts/`. Equal-weight
-   basket rebalanced via Alpaca paper. ML side-cars live in shadow
-   mode; the live trader is intentionally simple.
-3. **Agent** — `python/agent/` runs the chat loop. Uses the local
-   `claude` CLI (Max subscription, no API charges) by default; Ollama
-   fallback. Tools registered in `python/agent/tools/`.
+2. **Proteus (the trading bot)** — `python/trading/` + `python/scripts/`.
+   Equal-weight basket rebalanced via Alpaca paper. ML side-cars live
+   in shadow mode; the live trader is intentionally simple.
+3. **Theo (the agent)** — `python/agent/` runs the chat loop. Uses
+   the local `claude` CLI (Max subscription, no API charges) by
+   default; Ollama fallback. Tools registered in `python/agent/tools/`.
 4. **Flutter chat app** — `flutter_app/` (this is the surface the human
-   chats through). Firestore sync via the Python `firebase_bridge`.
+   chats through Theo). Firestore sync via the Python `firebase_bridge`.
 
 ## Stack
 
@@ -36,8 +50,8 @@ systems:
 ```
 IDENTITY.md                  # design intent — read first, every session
 docs/
-  bot-playbook.md            # operational lessons from prior trading work
-  skills/                    # the six trading-bot skills (4 enforced, 2 reference)
+  bot-playbook.md            # operational lessons from prior Proteus work
+  skills/                    # the six Proteus skills (4 enforced, 2 reference)
   research/                  # market research that informed the trading work
 python/
   agent/                     # the chat agent: brain + tools + bridges + state
@@ -117,12 +131,12 @@ That's by design — the bridge architecture moves the agent off-device.
 
 The repo started as a remote-support tool (Windows agent for screen
 capture + input injection — still present under `src/`). It pivoted
-into a trading bot, then absorbed an agent layer, now a Flutter chat
-surface. The Windows agent code is dormant but not removed — it's
-part of the project's history and may come back as a tool the agent
-operates.
+into Proteus (the trading bot), then absorbed Theo (the agent layer),
+now a Flutter chat surface. The Windows agent code is dormant but
+not removed — it's part of the project's history and may come back
+as a tool Theo operates.
 
-The shape worth holding in mind: **IDENTITY.md is the spine; the
-agent and its tools are the limbs; trading is one capability; chat is
-the surface; transcripts + notes + identity are the memory.** Future
+The shape worth holding in mind: **IDENTITY.md is the spine; Theo
+and his tools are the limbs; Proteus is one capability; chat is the
+surface; transcripts + notes + identity are the memory.** Future
 capabilities slot in as new tools without re-architecting.
