@@ -50,16 +50,23 @@ def _portfolio() -> dict[str, Any]:
     }
 
 
-def _rebalance_plan(min_trade_dollars: float = 50.0) -> dict[str, Any]:
+def _rebalance_plan(min_trade_dollars: float = 50.0,
+                    min_drift_pct: float = 0.0) -> dict[str, Any]:
     # Lazy-import the existing planner so we don't duplicate logic.
     from scripts.paper_runner import _client, build_plan, _safety_check
     from trading.universes import DEFAULT_UNIVERSE
     client = _client()
     _safety_check(client)
-    plan = build_plan(client, DEFAULT_UNIVERSE, min_trade_dollars=min_trade_dollars)
+    plan, drift_table = build_plan(
+        client, DEFAULT_UNIVERSE,
+        min_trade_dollars=min_trade_dollars,
+        min_drift_pct=min_drift_pct,
+    )
     return {
         "min_trade_dollars": min_trade_dollars,
-        "n_trades_planned": len(plan),
+        "min_drift_pct":     min_drift_pct,
+        "n_trades_planned":  len(plan),
+        "n_in_band":         sum(1 for r in drift_table if r["in_band"]),
         "trades": [
             {
                 "symbol": p.symbol,
@@ -72,6 +79,10 @@ def _rebalance_plan(min_trade_dollars: float = 50.0) -> dict[str, Any]:
             }
             for p in plan
         ],
+        # Per-symbol drift snapshot for every symbol, not just the ones
+        # we're trading. This is what the human reads to confirm the
+        # rebalancer is doing the right thing on quiet days.
+        "drift_table": drift_table,
     }
 
 
@@ -132,14 +143,28 @@ PORTFOLIO_TOOL = Tool(
 REBALANCE_PLAN_TOOL = Tool(
     name="rebalance_plan",
     description=("Dry-run the equal-weight rebalance — return the trades "
-                 "that would be placed but do not actually trade. "
-                 "Use min_trade_dollars to set the minimum trade size."),
+                 "that would be placed (no actual orders), plus the "
+                 "per-symbol drift_table for every symbol whether or not "
+                 "it's being traded. A symbol is only skipped when BOTH "
+                 "thresholds say skip: |delta_value| < min_trade_dollars "
+                 "AND |drift_pct| < min_drift_pct. Pass min_drift_pct=0 "
+                 "(default) for legacy absolute-dollar-only behavior; "
+                 "pass e.g. 3 to add a 3% relative band that scales with "
+                 "account equity."),
     parameters_schema={
         "type": "object",
         "properties": {
             "min_trade_dollars": {
                 "type": "number",
-                "description": "Skip trades smaller than this dollar amount. Default 50.",
+                "description": "Absolute dollar floor. Skip trades smaller than this. Default 50.",
+            },
+            "min_drift_pct": {
+                "type": "number",
+                "description": (
+                    "Relative drift band (percent of target). Skip "
+                    "symbols whose drift is within this band AND below "
+                    "the dollar floor. Default 0 (band disabled)."
+                ),
             },
         },
         "additionalProperties": False,
