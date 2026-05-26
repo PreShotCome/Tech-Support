@@ -145,8 +145,16 @@ def build_plan(client, symbols: list[str],
         drift_pct = (delta_val / target_per * 100.0) if target_per > 0 else 0.0
 
         skip_by_dollars = abs(delta_val) < min_trade_dollars
-        skip_by_pct     = abs(drift_pct)  < min_drift_pct
-        skipped = skip_by_dollars and skip_by_pct
+        # min_drift_pct <= 0 means "band disabled" — fall back to pure
+        # dollar-floor behavior. Without this guard, the prior
+        # `abs(drift_pct) < 0` test was permanently False, which made
+        # the AND short-circuit to False and silently disabled the
+        # dollar floor too. Theo caught it in spec review.
+        if min_drift_pct <= 0:
+            skipped = skip_by_dollars
+        else:
+            skip_by_pct = abs(drift_pct) < min_drift_pct
+            skipped = skip_by_dollars and skip_by_pct
 
         drift_table.append({
             "symbol":        sym,
@@ -244,6 +252,8 @@ def submit_orders(client, plan: list[Plan], execute: bool) -> None:
         try:
             order = client.submit_order(req)
             print(f"  {p.symbol:<7} {side.value:<4} {qty:>10.4f}  order_id={order.id}")
+            drift_pct = ((p.delta_value / p.target_value * 100.0)
+                         if p.target_value > 0 else None)
             _log_decision({
                 "event":         "order_submitted",
                 "reason":        "equal_weight_rebalance",
@@ -254,6 +264,7 @@ def submit_orders(client, plan: list[Plan], execute: bool) -> None:
                 "current_value": p.current_value,
                 "target_value":  p.target_value,
                 "delta_value":   p.delta_value,
+                "drift_pct":     drift_pct,
                 "order_id":      str(getattr(order, "id", "")),
             })
         except Exception as e:
