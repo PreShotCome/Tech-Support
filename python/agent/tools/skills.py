@@ -27,7 +27,10 @@ from typing import Any
 from .base import Tool
 
 
-SKILLS_REPO_REL = "docs/research/claude-plugins-official"
+SKILLS_REPO_REL = "docs/research"   # scan ALL of research/, not just
+                                     # claude-plugins-official — any
+                                     # repo that ships SKILL.md files
+                                     # under research/ gets indexed
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n(.*)", re.DOTALL)
 _YAML_KEY_RE = re.compile(r"^(?P<key>\w+)\s*:\s*(?P<val>.+?)\s*$", re.MULTILINE)
 
@@ -75,11 +78,22 @@ def _discover_skills() -> list[dict]:
         except Exception:
             continue
         fm, body = _parse_frontmatter(text)
-        # Plugin name from path: <skills_root>/<bucket>/<plugin>/skills/<skill>/SKILL.md
+        # Plugin / source naming from path:
+        #   claude-plugins-official/<bucket>/<plugin>/skills/<skill>/SKILL.md
+        #     -> bucket=<bucket>, plugin=<plugin>
+        #   <repo>/.../skills/<skill>/SKILL.md  (e.g. dexter)
+        #     -> bucket=<repo>, plugin=<repo>
         try:
             parts = p.relative_to(root).parts
-            bucket = parts[0] if parts else ""    # plugins / external_plugins
-            plugin = parts[1] if len(parts) > 1 else "unknown"
+            repo = parts[0] if parts else "unknown"
+            if repo == "claude-plugins-official" and len(parts) >= 4:
+                # Anthropic's repo: <bucket>/<plugin>/skills/<skill>/SKILL.md
+                bucket = parts[1]
+                plugin = parts[2]
+            else:
+                # Other repos: repo name becomes bucket+plugin
+                bucket = repo
+                plugin = repo
         except Exception:
             bucket, plugin = "", "unknown"
         out.append({
