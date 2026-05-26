@@ -55,6 +55,28 @@
   Real-time face swap / video deepfake from a single source image.
   Dual-use; read the project's own ethical notes in the README.
 
+## Trading / finance (Proteus material)
+
+- **[financial-services](./financial-services/)** — **Anthropic's
+  own** patterns for Claude in finance. 249 markdown files including
+  10 managed-agent cookbooks (model-builder, pitch-agent, market-
+  researcher, valuation-reviewer, earnings-reviewer, kyc-screener,
+  statement-auditor, gl-reconciler, month-end-closer, meeting-prep)
+  plus partner-built plugins (LSEG, S&P Global) and the Microsoft
+  365 install path. Highest-signal reference for how Theo should
+  approach financial workflows.
+- **[dexter](https://github.com/virattt/dexter)** — Trading-agent
+  project. Similar shape to Theo's trading slice; useful for
+  architectural ideas.
+- **[Kronos](https://github.com/shiyu-coder/Kronos)** — Time-series
+  forecasting research codebase.
+- **[Finance](https://github.com/shashankvemuri/Finance)** —
+  Python collection of indicators, screeners, TA snippets. Reference
+  when Theo needs to recall a specific indicator formula or
+  screening pattern for Proteus work.
+- **[awesome-ai-in-finance](https://github.com/georgezouq/awesome-ai-in-finance)** —
+  Curated list of AI/ML finance projects. Meta-reference.
+
 ## Backend / infrastructure / data
 
 - **[supabase](https://github.com/supabase/supabase)** — Open-source
