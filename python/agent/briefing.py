@@ -123,6 +123,19 @@ def compose_briefing(
         parts.append(drift_block)
         parts.append("")
 
+    # Register check — read recent user turns and flag tone signals
+    # (fatigue, stress, late-night, long silence). Heuristic only.
+    try:
+        from .tools.register_check import _register_check, render_briefing_block as _rc_block
+        rc = _register_check()
+        rc_block = _rc_block(rc)
+    except Exception:
+        rc_block = ""
+    if rc_block:
+        parts.append("### Register check (recent user turns)\n")
+        parts.append(rc_block)
+        parts.append("")
+
     # Recent transcripts (head + tail of each)
     transcripts = TranscriptLogger.list_transcripts(transcripts_dir)
     if transcripts:

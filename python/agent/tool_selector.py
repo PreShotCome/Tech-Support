@@ -47,7 +47,9 @@ CORE_TOOLS: set[str] = {
     "add_chapter", "read_narrative",
     "open_thread", "close_thread", "list_threads",
     "summarize_session", "read_summaries",
-    "check_drift",
+    "check_drift", "register_check",
+    # episodic recall — distinct from semantic; bias toward recent convos
+    "recall_episodic",
     # skills registry — discovering and loading SKILL.md instructions
     "list_skills", "read_skill",
 }
@@ -140,6 +142,12 @@ OPTIONAL_CATEGORIES: dict[str, tuple[set[str], str]] = {
         {"generate_ascii"},
         "ASCII art, convert image to ASCII, text art, terminal-style "
         "decoration, monospace picture, fun ASCII conversion",
+    ),
+    "vision": (
+        {"describe_image"},
+        "see this image, what's in this picture, describe what I'm "
+        "looking at, read the text in this screenshot, what does this "
+        "show, look at this image, vision",
     ),
 }
 

@@ -45,6 +45,8 @@ def _import_modules():
     from . import image_gen
     from . import qr
     from . import ascii_art
+    from . import vision
+    from . import register_check as _register_check
     return [
         ("trading",         trading),
         ("memory",          memory),
@@ -66,6 +68,8 @@ def _import_modules():
         ("image_gen",       image_gen),
         ("qr",              qr),
         ("ascii",           ascii_art),
+        ("vision",          vision),
+        ("register_check",  _register_check),
     ]
 
 
