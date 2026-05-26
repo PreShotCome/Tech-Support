@@ -85,6 +85,12 @@ flutter_app/.packages
 flutter_app/build/
 flutter_app/ios/Pods/
 flutter_app/android/.gradle/
+flutter_app/.firebase/
+flutter_app/web/brain.json
+
+# runtime logs from the agent bridge / CLI
+.agent.err
+.agent.log
 
 # launcher diagnostic logs
 refresh-brain.log

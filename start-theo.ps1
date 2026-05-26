@@ -52,12 +52,14 @@ if (-not $NoPull) {
         if (-not $git) {
             Write-Host "(git not on PATH; skipping pull)" -ForegroundColor DarkGray
         } else {
-            # If working tree has uncommitted changes, don't risk a
-            # merge conflict — warn and skip.
-            $dirty = (git status --porcelain) | Out-String
-            if ($dirty.Trim()) {
-                Write-Host "(working tree has uncommitted changes; skipping pull to avoid conflicts)" -ForegroundColor Yellow
-                Write-Host "  Use -NoPull next time to silence this, or commit/stash first." -ForegroundColor DarkGray
+            # Check ONLY for modified tracked files. `git pull --ff-only`
+            # doesn't care about untracked files (.agent.log, generated
+            # brain.json, etc.) so we shouldn't block on them either.
+            git diff --quiet 2>&1 | Out-Null
+            $dirty_tracked = $LASTEXITCODE -ne 0
+            if ($dirty_tracked) {
+                Write-Host "(working tree has modified tracked files; skipping pull to avoid conflicts)" -ForegroundColor Yellow
+                Write-Host "  Run `git status` to see what's modified. Use -NoPull next time to silence." -ForegroundColor DarkGray
             } else {
                 Write-Host "Pulling latest..." -ForegroundColor Cyan
                 git pull --ff-only 2>&1 | ForEach-Object { Write-Host "  $_" }
