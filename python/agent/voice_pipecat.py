@@ -124,9 +124,26 @@ def _build_agent(backend: str, model: str | None):
 
 async def _run(args):
     agent = _build_agent(args.backend, args.model)
+
+    # Voice choice: CLI flag wins; otherwise read Theo's stored choice;
+    # otherwise fall back to a reasonable default. If no voice is
+    # stored AND no flag was passed, surface the situation in the
+    # banner so Theo / Ian know to pick one.
+    from .state import load_voice
+    stored_voice = load_voice()
+    if args.voice:
+        chosen_voice = args.voice
+        voice_source = "CLI flag"
+    elif stored_voice:
+        chosen_voice = stored_voice
+        voice_source = "stored choice"
+    else:
+        chosen_voice = "en_US-ryan-high"
+        voice_source = "DEFAULT — Theo hasn't picked a voice yet; call list_voice_candidates + set_voice"
+
     print(f"Theo voice REPL  ·  Pipecat / Whisper / Piper")
     print(f"  STT:   faster-whisper / {args.whisper_model}")
-    print(f"  TTS:   piper / {args.voice}")
+    print(f"  TTS:   piper / {chosen_voice}  ({voice_source})")
     print(f"  Brain: {agent.llm.__class__.__name__} / "
           f"{getattr(agent.llm, 'model', '?')}")
     print(f"  Tools: {len(agent.tools.names())} registered")
@@ -152,7 +169,7 @@ async def _run(args):
 
     tts = PiperTTSService(
         settings=PiperTTSService.Settings(
-            voice=args.voice,
+            voice=chosen_voice,
         ),
     )
 
@@ -188,8 +205,14 @@ def main():
                    help="Brain model. Defaults: claude-opus-4-7 / llama3.1:8b.")
     p.add_argument("--whisper-model", default="base.en",
                    help="faster-whisper model. tiny.en / base.en / small.en / medium.en. Default base.en.")
-    p.add_argument("--voice", default="en_US-ryan-high",
-                   help="Piper voice id. Run `python -m piper.download_voices --help` to discover more.")
+    p.add_argument("--voice", default=None,
+                   help=(
+                       "Piper voice id. If omitted, uses Theo's stored "
+                       "choice (~/.techsupport_agent/voice.txt) or "
+                       "en_US-ryan-high as final fallback. Override "
+                       "for one-off testing without changing Theo's "
+                       "saved identity."
+                   ))
     args = p.parse_args()
 
     try:

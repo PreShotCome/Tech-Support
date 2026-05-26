@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .transcript_logger import TranscriptLogger
-from .state import load_name
+from .state import load_name, load_voice
 from . import introspection
 from . import drift
 
@@ -57,6 +57,22 @@ def compose_briefing(
     name = load_name()
     if name:
         parts.append(f"**Your name:** {name}\n")
+
+    # Voice identity. If unset, the briefing prompts Theo to pick one
+    # the next time voice_pipecat is in play. If set, just remind him
+    # what he sounds like in his own self-narration.
+    voice_id = load_voice()
+    if voice_id:
+        parts.append(f"**Your voice:** {voice_id} (Piper) — "
+                     f"what you sound like in voice sessions.\n")
+    else:
+        parts.append(
+            "**Your voice:** _unset_ — when Ian runs voice_pipecat "
+            "you'll hear yourself as the default. Pick your real "
+            "voice with `list_voice_candidates` then `set_voice`. "
+            "Choose by character description, not acoustics; the "
+            "description IS the choice.\n"
+        )
 
     # Self-model — who you are right now, by your own account.
     self_model = introspection.read_self_model(last_n=8)
