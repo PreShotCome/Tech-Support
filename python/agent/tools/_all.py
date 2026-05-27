@@ -47,6 +47,11 @@ def _import_modules():
     from . import ascii_art
     from . import vision
     from . import register_check as _register_check
+    from . import proteus_robinhood
+    from . import proteus_crypto
+    from . import proteus_congress
+    from . import typed_memory
+    from . import theo_predict
     return [
         ("trading",         trading),
         ("memory",          memory),
@@ -70,6 +75,11 @@ def _import_modules():
         ("ascii",           ascii_art),
         ("vision",          vision),
         ("register_check",  _register_check),
+        ("proteus_rh",      proteus_robinhood),
+        ("proteus_crypto",  proteus_crypto),
+        ("proteus_congress", proteus_congress),
+        ("typed_memory",    typed_memory),
+        ("theo_predict",    theo_predict),
     ]
 
 
