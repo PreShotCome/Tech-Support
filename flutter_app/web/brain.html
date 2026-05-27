@@ -346,6 +346,7 @@
     import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
     import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
     import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
     // =================================================================
     // CONFIG — region centers in 3D space + category mapping.
@@ -651,6 +652,8 @@
       return g;
     }
 
+    // Procedural fallbacks — shown while the .glb loads, and used
+    // permanently if the load fails.
     const cortex      = buildCortex();
     const cerebellum  = buildCerebellum();
     const brainstem   = buildBrainstem();
@@ -660,6 +663,63 @@
     brainGroup.add(cerebellum);
     brainGroup.add(brainstem);
     brainGroup.add(limbicCore);
+
+    // ---- Real anatomical mesh (brain.glb by Oxterium, Sketchfab Standard) ----
+    // Swap in once it loads. Keep limbicCore as the inner glowing core.
+    let loadedBrain = null;
+    const loader = new GLTFLoader();
+    loader.load(
+      "assets/brain.glb",
+      (gltf) => {
+        const realBrain = gltf.scene;
+
+        // Re-skin every Mesh in the model with our holographic wireframe.
+        realBrain.traverse((obj) => {
+          if (obj.isMesh) {
+            obj.material = new THREE.MeshBasicMaterial({
+              color: 0xF4A23B,
+              wireframe: true,
+              transparent: true,
+              opacity: 0.6,
+            });
+            // A faint additive backside fill for volumetric feel
+            const fillMat = new THREE.MeshBasicMaterial({
+              color: 0xF4A23B,
+              transparent: true,
+              opacity: 0.04,
+              side: THREE.BackSide,
+              depthWrite: false,
+            });
+            const fillMesh = new THREE.Mesh(obj.geometry, fillMat);
+            obj.add(fillMesh);
+          }
+        });
+
+        // Normalize scale + center the model so it occupies the same
+        // envelope as our procedural cortex (~3.3 wide). The Sketchfab
+        // model likely comes in arbitrary units / off-center.
+        const box = new THREE.Box3().setFromObject(realBrain);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        // Use the longest dimension as the reference and scale to 3.3
+        const longest = Math.max(size.x, size.y, size.z);
+        const scale = 3.3 / longest;
+        realBrain.scale.setScalar(scale);
+        // Recenter at origin after scale
+        realBrain.position.sub(center.multiplyScalar(scale));
+
+        // Swap: drop the procedural cortex/cerebellum/stem, add the real one.
+        brainGroup.remove(cortex);
+        brainGroup.remove(cerebellum);
+        brainGroup.remove(brainstem);
+        brainGroup.add(realBrain);
+        loadedBrain = realBrain;
+      },
+      undefined,
+      (err) => {
+        console.warn("Failed to load brain.glb, keeping procedural fallback.", err);
+      },
+    );
 
     // =================================================================
     // NODES — one Mesh per node, positioned in its region's volume.
