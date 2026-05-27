@@ -991,7 +991,7 @@
             depthWrite: false,
           });
           const sprite = new THREE.Sprite(mat);
-          sprite.scale.set(0.42, 0.42, 0.42);
+          sprite.scale.set(0.80, 0.80, 0.80);
           const { cluster, expand } = computeNodePositions(regionId, region);
           sprite.position.copy(cluster);
           sprite.userData = {
@@ -1021,9 +1021,10 @@
       const ctx = c.getContext("2d");
       const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
       g.addColorStop(0.00, "rgba(255,255,255,1.00)");
-      g.addColorStop(0.12, "rgba(255,255,255,0.92)");
-      g.addColorStop(0.30, "rgba(255,255,255,0.55)");
-      g.addColorStop(0.55, "rgba(255,255,255,0.18)");
+      g.addColorStop(0.05, "rgba(255,255,255,0.98)");
+      g.addColorStop(0.18, "rgba(255,255,255,0.45)");
+      g.addColorStop(0.40, "rgba(255,255,255,0.14)");
+      g.addColorStop(0.70, "rgba(255,255,255,0.04)");
       g.addColorStop(1.00, "rgba(255,255,255,0.00)");
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, 128, 128);
