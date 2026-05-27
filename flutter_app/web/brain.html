@@ -987,21 +987,19 @@
     const SHELL_DEEP    = 0.35;
     const SHELL_SURFACE = 1.10;
 
-    // Per-region angular jitter for cluster vs expand. CLUSTER_JITTER
-    // controls separation at the default (zoomed-out) view -- bigger =
-    // less smooshed. EXPAND_JITTER controls the spread at full zoom-in.
-    // Keep expand jitter modest so nodes from one region don't bleed
-    // into another's zone; the visible drama comes mostly from node
-    // SCALING (NODE_SCALE_MAX) and from the positional shell delta.
-    const CLUSTER_JITTER = 0.18;
-    const EXPAND_JITTER  = 1.15;
+    // Angular spread (in tangent-plane units, ~radians for small values)
+    // around the region's center direction. CLUSTER_SPREAD is the cone
+    // half-angle at the default view -- small = tight packs. EXPAND_SPREAD
+    // is the cone half-angle at full zoom-in -- bigger = wider arc of
+    // nodes visibly fanning out across the brain surface.
+    const CLUSTER_SPREAD = 0.15;
+    const EXPAND_SPREAD  = 0.85;
 
-    // Node scale interpolation: at full zoom-in nodes scale by this
-    // factor relative to their default size. That's the other half of
-    // the Iron Man "grows quickly and vastly" effect -- they actually
-    // get visibly bigger, not just farther apart.
+    // Node scale interpolation. Keep max modest so nodes don't visually
+    // overlap when spread out -- the drama comes from the angular spread,
+    // not from making each node huge.
     const NODE_SCALE_MIN = 1.0;
-    const NODE_SCALE_MAX = 3.0;
+    const NODE_SCALE_MAX = 1.6;
 
     // Zoom trigger range. The expansion ramps over EXACTLY this distance
     // band -- shorter band = more dramatic per scroll click. We want it
@@ -1021,23 +1019,51 @@
       return 1 / Math.sqrt(Math.max(denom, 1e-9));
     }
 
-    // Surface-relative position: pick a direction (region center + jitter),
-    // walk out to `factor * envelope_radius` along it.
-    function surfacePosition(region, factor, jitterAmt) {
-      const target = new THREE.Vector3(
-        region.cx + (Math.random() - 0.5) * jitterAmt,
-        region.cy + (Math.random() - 0.5) * jitterAmt,
-        region.cz + (Math.random() - 0.5) * jitterAmt,
+    // Random unit vector perpendicular to `axis`. Used to spread nodes
+    // ANGULARLY around a region's center direction instead of adding
+    // jitter to coordinates (the old approach silently collapsed
+    // similar-jitter values into similar directions after normalize).
+    const _spreadHelper = new THREE.Vector3();
+    const _spreadPerp1  = new THREE.Vector3();
+    const _spreadPerp2  = new THREE.Vector3();
+    function randomPerpUnit(axis) {
+      _spreadHelper.set(
+        Math.abs(axis.x) < 0.9 ? 1 : 0,
+        Math.abs(axis.x) < 0.9 ? 0 : 1,
+        0,
       );
+      _spreadPerp1.crossVectors(axis, _spreadHelper).normalize();
+      _spreadPerp2.crossVectors(axis, _spreadPerp1).normalize();
+      const theta = Math.random() * Math.PI * 2;
+      return _spreadPerp1.clone().multiplyScalar(Math.cos(theta))
+        .add(_spreadPerp2.clone().multiplyScalar(Math.sin(theta)));
+    }
+
+    // Surface-relative position: take the region's center direction,
+    // rotate by a random angle within a `spread`-sized cone, then walk
+    // out to `factor * envelope_radius` along that direction. Spread is
+    // ANGULAR (a tangent-plane offset magnitude), so identical spread
+    // values from different calls produce truly different directions --
+    // nodes actually fan out across the brain surface.
+    function surfacePosition(region, factor, spread) {
+      const center = new THREE.Vector3(region.cx, region.cy, region.cz);
       if (_envelopeScale) {
-        target.x *= _envelopeScale.sx;
-        target.y *= _envelopeScale.sy;
-        target.z *= _envelopeScale.sz;
+        center.x *= _envelopeScale.sx;
+        center.y *= _envelopeScale.sy;
+        center.z *= _envelopeScale.sz;
       }
-      if (target.lengthSq() < 0.0001) {
-        return new THREE.Vector3(region.cx, region.cy, region.cz);
+      if (center.lengthSq() < 0.0001) {
+        // Region at origin — random unit dir as fallback
+        const v = new THREE.Vector3(
+          Math.random()-0.5, Math.random()-0.5, Math.random()-0.5,
+        ).normalize();
+        return v.multiplyScalar(ellipsoidT(v) * factor);
       }
-      const dir = target.clone().normalize();
+      const baseDir = center.normalize();
+      // Random offset in the tangent plane, magnitude up to `spread`
+      const r = Math.sqrt(Math.random()) * spread;  // sqrt for uniform area
+      const perp = randomPerpUnit(baseDir).multiplyScalar(r);
+      const dir = baseDir.clone().add(perp).normalize();
       return dir.multiplyScalar(ellipsoidT(dir) * factor);
     }
 
@@ -1072,8 +1098,8 @@
       // past), with much wider jitter on expand for the dramatic
       // "Iron Man element discovery" explosion.
       return {
-        cluster: surfacePosition(region, SHELL_DEEP,    CLUSTER_JITTER),
-        expand:  surfacePosition(region, SHELL_SURFACE, EXPAND_JITTER),
+        cluster: surfacePosition(region, SHELL_DEEP,    CLUSTER_SPREAD),
+        expand:  surfacePosition(region, SHELL_SURFACE, EXPAND_SPREAD),
       };
     }
 
