@@ -567,9 +567,10 @@
     "toolgroup:ascii":             "occipital",
     "toolgroup:vision":            "occipital",
     "toolgroup:register_check":    "limbic",
-    // Skills / Research
+    // Skills / Research — research lives in the larger temporal lobe;
+    // Wernicke is too small to hold 40+ repo nodes cleanly.
     "skills":                      "broca",
-    "research":                    "wernicke",
+    "research":                    "temporal",
     // Memory + introspective surfaces (limbic core)
     "memory":                      "limbic",
     "threads":                     "frontal",
@@ -679,14 +680,25 @@
     _allNodes = nodes;
     _allLinks = links;
 
-    // d3 force simulation
+    // d3 force simulation. Anchor strength dialed by region size —
+    // big regions (temporal, parietal) get gentler anchors so nodes
+    // spread to fill them. Small regions (broca, occipital) get
+    // stronger anchors to keep nodes inside.
     _sim = d3.forceSimulation(nodes)
-      .force("x", d3.forceX(d => REGIONS[d.region].cx).strength(0.18))
-      .force("y", d3.forceY(d => REGIONS[d.region].cy).strength(0.18))
-      .force("collide", d3.forceCollide().radius(7).strength(0.8))
-      .force("charge", d3.forceManyBody().strength(-12))
-      .alpha(0.8)
-      .alphaDecay(0.035);
+      .force("x", d3.forceX(d => REGIONS[d.region].cx)
+        .strength(d => {
+          const r = REGIONS[d.region];
+          return Math.min(r.rx, r.ry) < 60 ? 0.22 : 0.10;
+        }))
+      .force("y", d3.forceY(d => REGIONS[d.region].cy)
+        .strength(d => {
+          const r = REGIONS[d.region];
+          return Math.min(r.rx, r.ry) < 60 ? 0.22 : 0.10;
+        }))
+      .force("collide", d3.forceCollide().radius(6).strength(0.9))
+      .force("charge", d3.forceManyBody().strength(-8))
+      .alpha(0.9)
+      .alphaDecay(0.025);
 
     const pathwayG = d3.select("#pathways");
     const nodeG = d3.select("#nodes");
