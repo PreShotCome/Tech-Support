@@ -540,7 +540,7 @@
     scene.fog = new THREE.FogExp2(0x02030a, 0.06);
 
     const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 100);
-    camera.position.set(0.0, 0.2, 4.2);
+    camera.position.set(0.0, 0.3, 8.5);
 
     const renderer = new THREE.WebGLRenderer({
       canvas, antialias: true, alpha: true,
@@ -1023,7 +1023,7 @@
     // to start the moment the user zooms in past default (4.2) so the
     // animation happens during the zoom-in, not lazily across the entire
     // possible zoom range.
-    const ZOOM_FAR  = 4.2;   // default distance, expandT = 0
+    const ZOOM_FAR  = 8.5;   // default distance, expandT = 0
     const ZOOM_NEAR = 1.0;   // closest, expandT = 1
 
     // Math helper: ray from origin in `dir` (unit vector) hits the
@@ -1280,7 +1280,7 @@
     // =================================================================
     function setupControls() {
       document.getElementById("zoom-fit").addEventListener("click", () => {
-        camera.position.set(0.0, 0.2, 4.2);
+        camera.position.set(0.0, 0.3, 8.5);
         controls.target.set(0, 0, 0);
         controls.update();
         clearRegionFocus();
@@ -1363,7 +1363,7 @@
 
     function clearRegionFocus() {
       _activeRegion = null;
-      animateCamera(new THREE.Vector3(0, 0, 0), 4.2);
+      animateCamera(new THREE.Vector3(0, 0, 0), 8.5);
       document.querySelectorAll(".region-pick.active").forEach(b => b.classList.remove("active"));
       document.getElementById("rail-clear").classList.remove("show");
       for (const m of _allNodeMeshes) m.material.opacity = 0.92;
