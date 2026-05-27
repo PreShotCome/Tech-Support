@@ -120,6 +120,10 @@ def _collect_tools() -> list[dict]:
 # ----------------------------------------------------------------- files
 
 def _docs_nodes(subdir: str, label_prefix: str) -> list[dict]:
+    """Flat per-file enumeration. Used for docs/skills/ where each
+    skill IS the unit. For docs/research/, use _research_nodes which
+    aggregates by repo so the brain doesn't drown in thousands of
+    chunks."""
     base = REPO / "docs" / subdir
     if not base.exists():
         return []
@@ -136,6 +140,63 @@ def _docs_nodes(subdir: str, label_prefix: str) -> list[dict]:
             "label": f"{label_prefix} · {title}",
             "body": text[:2000],
             "path": rel,
+        })
+    return out
+
+
+def _research_nodes() -> list[dict]:
+    """Aggregate docs/research/ by top-level subdirectory.
+
+    Each immediate subdir of docs/research/ becomes ONE node — the repo
+    or collection it represents — with a body that lists the files
+    inside and the file count. Without this, the brain visualization
+    spawns thousands of dots (financial-services alone ships 249
+    markdown files) and the regions stop being readable.
+
+    Skills stay individual (they're invokable units, not noise);
+    research aggregates because the unit of interest there is the
+    *repo*, not each file. Click an aggregate node to see what's
+    inside via the body listing."""
+    base = REPO / "docs" / "research"
+    if not base.exists():
+        return []
+    out: list[dict] = []
+    # Loose top-level files (e.g. _REPOS.md, stock-market-overview.md)
+    # become their own nodes — there are only a handful of these.
+    for p in sorted(base.iterdir()):
+        if p.is_file() and p.suffix.lower() == ".md":
+            rel = p.relative_to(REPO).as_posix()
+            try:
+                text = p.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            title = _first_heading(text) or p.stem
+            out.append({
+                "id":    f"doc:{rel}",
+                "label": f"Research · {title}",
+                "body":  text[:2000],
+                "path":  rel,
+            })
+    # Each subdir → ONE aggregate node
+    for d in sorted(p for p in base.iterdir() if p.is_dir()):
+        md_files = sorted(d.rglob("*.md"))
+        if not md_files:
+            continue
+        # Pick a representative summary file if present
+        body_lines = [f"# {d.name}", "",
+                      f"{len(md_files)} markdown files in this repo.", ""]
+        # Show the first few entries to give a quick read
+        for f in md_files[:30]:
+            rel_inside = f.relative_to(d).as_posix()
+            body_lines.append(f"  - {rel_inside}")
+        if len(md_files) > 30:
+            body_lines.append(f"  … and {len(md_files) - 30} more.")
+        out.append({
+            "id":          f"research:{d.name}",
+            "label":       f"Research · {d.name}",
+            "body":        "\n".join(body_lines),
+            "path":        f"docs/research/{d.name}/",
+            "file_count":  len(md_files),
         })
     return out
 
@@ -290,7 +351,7 @@ def collect() -> dict:
     categories.append({
         "id": "research",
         "label": "Research",
-        "nodes": _docs_nodes("research", "Research"),
+        "nodes": _research_nodes(),
     })
     categories.append({
         "id": "memory",
