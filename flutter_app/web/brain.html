@@ -970,19 +970,18 @@
       return v;
     }
 
-    // Regions that live INSIDE the brain mass (deep structures). Don't
-    // raycast for these — keep volumetric placement.
+    // Regions that live INSIDE the brain mass (deep structures). They
+    // get volumetric placement; cortical regions get surface placement.
     const _INSIDE_REGIONS = new Set(["limbic", "brainstem"]);
     const _surfaceRay = new THREE.Raycaster();
-    _surfaceRay.firstHitOnly = true; // hint for three-mesh-bvh if present
 
-    // Pick a position for a node. Cortical regions: raycast against the
-    // loaded brain mesh from a point well outside, inward through the
-    // region direction, and pin near the surface. Deep regions or before
-    // the mesh has loaded: volumetric ellipsoid sampling with envelope
-    // scale applied.
+    // Pick a position for a node.
+    //   Inside regions (limbic, brainstem) -> volumetric ellipsoid sample.
+    //   Cortical regions, GLB not yet loaded -> volumetric.
+    //   Cortical regions, GLB loaded -> try raycast (works for triangle
+    //     meshes); if no hit (e.g. the model is a point cloud), fall
+    //     back to "snap to brain envelope surface" via ellipsoid math.
     function placeNode(regionId, region) {
-      // Volumetric fallback
       const volumetric = () => {
         const v = randomPositionInRegion(region);
         if (_envelopeScale) {
@@ -995,10 +994,10 @@
       if (!loadedBrain || _INSIDE_REGIONS.has(regionId)) {
         return volumetric();
       }
-      // Direction from origin through the (scale-corrected) region center,
-      // with a small per-node jitter so the cluster spreads across the
-      // anatomical zone instead of stacking on one point.
-      const jitter = 0.30;
+
+      // Direction from origin through the (scale-corrected) region center
+      // with per-node jitter so the cluster spreads across the zone.
+      const jitter = 0.25;
       const target = new THREE.Vector3(
         region.cx + (Math.random() - 0.5) * jitter,
         region.cy + (Math.random() - 0.5) * jitter,
@@ -1010,25 +1009,48 @@
         target.z *= _envelopeScale.sz;
       }
       if (target.lengthSq() < 0.0001) return volumetric();
+      const dir = target.clone().normalize();
 
-      // Cast inward from a far point along the direction → first hit is
-      // the outer surface of the brain in that anatomical zone.
-      const dirOut  = target.clone().normalize();
-      const farPoint = dirOut.clone().multiplyScalar(5);
-      const dirIn = dirOut.clone().negate();
+      // First try raycaster against the loaded brain. If the model is a
+      // triangle mesh, this gives us the EXACT surface point.
+      const farPoint = dir.clone().multiplyScalar(5);
+      const dirIn = dir.clone().negate();
       _surfaceRay.set(farPoint, dirIn);
       _surfaceRay.far = 10;
       const hits = _surfaceRay.intersectObject(loadedBrain, true);
       if (hits.length > 0) {
-        // Pull slightly outward so the node sits on/just above the surface
-        return hits[0].point.clone().multiplyScalar(1.03);
+        return hits[0].point.clone().multiplyScalar(1.02);
       }
-      return volumetric();
+
+      // Raycast missed (model is a point cloud or non-triangle). Snap
+      // to the brain's bounding ellipsoid surface using analytical math.
+      // Ellipsoid: (x/a)^2 + (y/b)^2 + (z/c)^2 = 1 where a,b,c are the
+      // half-extents of the real brain envelope.
+      const a = 3.3 / 2;
+      const b = 1.9 * (_envelopeScale?.sy || 1) / 2;
+      const c = 2.1 * (_envelopeScale?.sz || 1) / 2;
+      const denom = (dir.x/a)**2 + (dir.y/b)**2 + (dir.z/c)**2;
+      if (denom < 1e-9) return volumetric();
+      // t = distance from origin along dir to the ellipsoid surface
+      const t = 1 / Math.sqrt(denom);
+      // Land at 92-100% of the way out so nodes sit ON the shell with
+      // a touch of depth variation
+      const factor = 0.92 + Math.random() * 0.08;
+      return dir.clone().multiplyScalar(t * factor);
     }
 
     // Re-place every existing node — called by the GLB success callback
     // once the loaded mesh is available for raycasting.
     function repinNodesToSurface() {
+      // Diagnostic: count how the GLB is structured so we know whether
+      // raycasting works or we're relying on the ellipsoid fallback.
+      let meshCount = 0, pointsCount = 0;
+      loadedBrain.traverse(o => {
+        if (o.isMesh) meshCount++;
+        if (o.isPoints) pointsCount++;
+      });
+      console.log(`brain.glb children: ${meshCount} Mesh, ${pointsCount} Points`);
+
       for (const m of _allNodeMeshes) {
         const regionId = m.userData.region;
         const region = REGIONS[regionId];
