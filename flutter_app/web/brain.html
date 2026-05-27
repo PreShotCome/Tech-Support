@@ -346,6 +346,7 @@
     import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
     import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
     import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
     // =================================================================
     // CONFIG — region centers in 3D space + category mapping.
@@ -353,17 +354,19 @@
     // Brain extends along X: +X = anterior (frontal), -X = posterior (occipital).
     // Y: +Y = superior (top), -Y = inferior (bottom).
     // Z: lateral (depth, points toward viewer in default camera).
+    // Region radii are tuned to keep nodes INSIDE the cortex envelope
+    // (which is roughly x:±1.65, y:±0.95, z:±1.05 after the noise displacement).
     const REGIONS = {
-      frontal:    { cx:  1.55, cy:  0.55, cz: 0.55, rx: 0.65, ry: 0.55, rz: 0.55, label: "Frontal — Voice / Identity" },
-      motor:      { cx:  0.35, cy:  1.05, cz: 0.45, rx: 0.55, ry: 0.20, rz: 0.55, label: "Motor — Tools" },
-      parietal:   { cx: -0.45, cy:  0.95, cz: 0.55, rx: 0.55, ry: 0.30, rz: 0.55, label: "Parietal — Memory" },
-      occipital:  { cx: -1.75, cy:  0.20, cz: 0.45, rx: 0.45, ry: 0.55, rz: 0.45, label: "Occipital — Vision" },
-      temporal:   { cx:  0.30, cy: -0.55, cz: 0.65, rx: 0.95, ry: 0.30, rz: 0.50, label: "Temporal — Episodic" },
-      wernicke:   { cx: -0.75, cy: -0.10, cz: 0.65, rx: 0.30, ry: 0.20, rz: 0.30, label: "Wernicke — Research" },
-      broca:      { cx:  1.40, cy: -0.25, cz: 0.55, rx: 0.30, ry: 0.20, rz: 0.30, label: "Broca — Skills" },
-      cerebellum: { cx: -1.55, cy: -0.75, cz: 0.20, rx: 0.45, ry: 0.30, rz: 0.40, label: "Cerebellum — Drift" },
-      brainstem:  { cx: -0.20, cy: -1.40, cz: 0.00, rx: 0.18, ry: 0.30, rz: 0.18, label: "Brain stem — Core" },
-      limbic:     { cx:  0.05, cy:  0.05, cz: 0.00, rx: 0.40, ry: 0.30, rz: 0.40, label: "Limbic — Self / Human / Narrative" },
+      frontal:    { cx:  0.85, cy:  0.20, cz: 0.30, rx: 0.40, ry: 0.35, rz: 0.30, label: "Frontal — Voice / Identity" },
+      motor:      { cx:  0.10, cy:  0.55, cz: 0.25, rx: 0.30, ry: 0.15, rz: 0.30, label: "Motor — Tools" },
+      parietal:   { cx: -0.45, cy:  0.45, cz: 0.30, rx: 0.40, ry: 0.25, rz: 0.30, label: "Parietal — Memory" },
+      occipital:  { cx: -1.15, cy:  0.05, cz: 0.15, rx: 0.28, ry: 0.40, rz: 0.25, label: "Occipital — Vision" },
+      temporal:   { cx:  0.20, cy: -0.40, cz: 0.40, rx: 0.65, ry: 0.20, rz: 0.25, label: "Temporal — Episodic" },
+      wernicke:   { cx: -0.55, cy: -0.10, cz: 0.35, rx: 0.20, ry: 0.15, rz: 0.20, label: "Wernicke — Research" },
+      broca:      { cx:  0.85, cy: -0.20, cz: 0.30, rx: 0.20, ry: 0.15, rz: 0.20, label: "Broca — Skills" },
+      cerebellum: { cx: -1.35, cy: -0.55, cz: 0.05, rx: 0.28, ry: 0.20, rz: 0.28, label: "Cerebellum — Drift" },
+      brainstem:  { cx: -0.20, cy: -1.15, cz: 0.00, rx: 0.10, ry: 0.25, rz: 0.10, label: "Brain stem — Core" },
+      limbic:     { cx:  0.00, cy:  0.00, cz: 0.00, rx: 0.28, ry: 0.20, rz: 0.28, label: "Limbic — Self / Human / Narrative" },
     };
 
     const CATEGORY_TO_REGION = {
@@ -449,9 +452,9 @@
     composer.addPass(new RenderPass(scene, camera));
     const bloom = new UnrealBloomPass(
       new THREE.Vector2(1, 1),
-      0.95,   // strength
-      0.85,   // radius
-      0.18,   // threshold (low = lots of bloom)
+      0.55,   // strength (lower = less halo bleed)
+      0.70,   // radius
+      0.28,   // threshold (higher = only brighter pixels bloom)
     );
     composer.addPass(bloom);
 
@@ -540,7 +543,7 @@
       const innerMat = new THREE.MeshBasicMaterial({
         color: 0xF4A23B,
         transparent: true,
-        opacity: 0.06,
+        opacity: 0.03,
         side: THREE.BackSide,
         depthWrite: false,
       });
@@ -649,31 +652,74 @@
       return g;
     }
 
-    // ---- OUTER BRAIN HALO (volumetric glow around whole brain) ----
-    function buildBrainHalo() {
-      const geom = new THREE.SphereGeometry(2.3, 32, 32);
-      const mat = new THREE.MeshBasicMaterial({
-        color: 0xF4A23B,
-        transparent: true,
-        opacity: 0.03,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.BackSide,
-      });
-      return new THREE.Mesh(geom, mat);
-    }
-
+    // Procedural fallbacks — shown while the .glb loads, and used
+    // permanently if the load fails.
     const cortex      = buildCortex();
     const cerebellum  = buildCerebellum();
     const brainstem   = buildBrainstem();
     const limbicCore  = buildLimbicCore();
-    const brainHalo   = buildBrainHalo();
 
-    brainGroup.add(brainHalo);
     brainGroup.add(cortex);
     brainGroup.add(cerebellum);
     brainGroup.add(brainstem);
     brainGroup.add(limbicCore);
+
+    // ---- Real anatomical mesh (brain.glb by Oxterium, Sketchfab Standard) ----
+    // Swap in once it loads. Keep limbicCore as the inner glowing core.
+    let loadedBrain = null;
+    const loader = new GLTFLoader();
+    loader.load(
+      "assets/brain.glb",
+      (gltf) => {
+        const realBrain = gltf.scene;
+
+        // Re-skin every Mesh in the model with our holographic wireframe.
+        realBrain.traverse((obj) => {
+          if (obj.isMesh) {
+            obj.material = new THREE.MeshBasicMaterial({
+              color: 0xF4A23B,
+              wireframe: true,
+              transparent: true,
+              opacity: 0.6,
+            });
+            // A faint additive backside fill for volumetric feel
+            const fillMat = new THREE.MeshBasicMaterial({
+              color: 0xF4A23B,
+              transparent: true,
+              opacity: 0.04,
+              side: THREE.BackSide,
+              depthWrite: false,
+            });
+            const fillMesh = new THREE.Mesh(obj.geometry, fillMat);
+            obj.add(fillMesh);
+          }
+        });
+
+        // Normalize scale + center the model so it occupies the same
+        // envelope as our procedural cortex (~3.3 wide). The Sketchfab
+        // model likely comes in arbitrary units / off-center.
+        const box = new THREE.Box3().setFromObject(realBrain);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        // Use the longest dimension as the reference and scale to 3.3
+        const longest = Math.max(size.x, size.y, size.z);
+        const scale = 3.3 / longest;
+        realBrain.scale.setScalar(scale);
+        // Recenter at origin after scale
+        realBrain.position.sub(center.multiplyScalar(scale));
+
+        // Swap: drop the procedural cortex/cerebellum/stem, add the real one.
+        brainGroup.remove(cortex);
+        brainGroup.remove(cerebellum);
+        brainGroup.remove(brainstem);
+        brainGroup.add(realBrain);
+        loadedBrain = realBrain;
+      },
+      undefined,
+      (err) => {
+        console.warn("Failed to load brain.glb, keeping procedural fallback.", err);
+      },
+    );
 
     // =================================================================
     // NODES — one Mesh per node, positioned in its region's volume.
