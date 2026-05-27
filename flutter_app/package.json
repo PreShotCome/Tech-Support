@@ -1,0 +1,13 @@
+{
+  "name": "techsupport-web-lint",
+  "private": true,
+  "type": "module",
+  "description": "Lint config for flutter_app/web/brain.js. Not shipped to deploy.",
+  "scripts": {
+    "lint": "eslint web/brain.js"
+  },
+  "devDependencies": {
+    "eslint": "^9.18.0",
+    "globals": "^15.14.0"
+  }
+}
