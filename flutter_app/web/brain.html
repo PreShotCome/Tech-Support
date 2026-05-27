@@ -984,8 +984,8 @@
     //                   perfect ellipsoids, so 0.5 sits inside the bulk.
     //   SHELL_SURFACE = how far out the EXPANDED position sits. 1.0 puts
     //                   nodes right on the envelope; >1.0 explodes past it.
-    const SHELL_DEEP    = 0.45;
-    const SHELL_SURFACE = 0.92;
+    const SHELL_DEEP    = 0.35;
+    const SHELL_SURFACE = 1.10;
 
     // Per-region angular jitter for cluster vs expand. CLUSTER_JITTER
     // controls separation at the default (zoomed-out) view -- bigger =
@@ -993,15 +993,23 @@
     // Keep expand jitter modest so nodes from one region don't bleed
     // into another's zone; the visible drama comes mostly from node
     // SCALING (NODE_SCALE_MAX) and from the positional shell delta.
-    const CLUSTER_JITTER = 0.32;
-    const EXPAND_JITTER  = 0.85;
+    const CLUSTER_JITTER = 0.18;
+    const EXPAND_JITTER  = 1.15;
 
     // Node scale interpolation: at full zoom-in nodes scale by this
     // factor relative to their default size. That's the other half of
     // the Iron Man "grows quickly and vastly" effect -- they actually
     // get visibly bigger, not just farther apart.
     const NODE_SCALE_MIN = 1.0;
-    const NODE_SCALE_MAX = 2.2;
+    const NODE_SCALE_MAX = 3.0;
+
+    // Zoom trigger range. The expansion ramps over EXACTLY this distance
+    // band -- shorter band = more dramatic per scroll click. We want it
+    // to start the moment the user zooms in past default (4.2) so the
+    // animation happens during the zoom-in, not lazily across the entire
+    // possible zoom range.
+    const ZOOM_FAR  = 4.2;   // default distance, expandT = 0
+    const ZOOM_NEAR = 1.0;   // closest, expandT = 1
 
     // Math helper: ray from origin in `dir` (unit vector) hits the
     // brain's bounding ellipsoid at distance t. Solve (x/a)^2+(y/b)^2+(z/c)^2=1.
@@ -1355,7 +1363,7 @@
       // feel continuous (not the "two modes" Ian reported in v3.11).
       const camDist = camera.position.distanceTo(controls.target);
       const expandT = THREE.MathUtils.clamp(
-        1 - (camDist - 1.0) / 6.0,
+        (ZOOM_FAR - camDist) / (ZOOM_FAR - ZOOM_NEAR),
         0, 1,
       );
       const nodeScale = NODE_SCALE_MIN + (NODE_SCALE_MAX - NODE_SCALE_MIN) * expandT;
