@@ -524,8 +524,8 @@
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x02030a, 0.06);
 
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-    camera.position.set(0.0, 0.4, 7.2);
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 100);
+    camera.position.set(0.0, 0.3, 5.5);
 
     const renderer = new THREE.WebGLRenderer({
       canvas, antialias: true, alpha: true,
@@ -552,8 +552,8 @@
     controls.enableDamping = true;
     controls.dampingFactor = 0.07;
     controls.rotateSpeed = 0.7;
-    controls.minDistance = 3.5;
-    controls.maxDistance = 14;
+    controls.minDistance = 0.8;
+    controls.maxDistance = 25;
     controls.target.set(0, 0, 0);
     controls.autoRotate = false;
     controls.autoRotateSpeed = 0.45;
@@ -705,21 +705,21 @@
     function buildLimbicCore() {
       const g = new THREE.Group();
       const inner = new THREE.Mesh(
-        new THREE.SphereGeometry(0.22, 32, 32),
+        new THREE.SphereGeometry(0.18, 32, 32),
         new THREE.MeshBasicMaterial({
           color: 0xFFD27A,
           transparent: true,
-          opacity: 0.45,
+          opacity: 0.28,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         }),
       );
       const outer = new THREE.Mesh(
-        new THREE.SphereGeometry(0.38, 32, 32),
+        new THREE.SphereGeometry(0.32, 32, 32),
         new THREE.MeshBasicMaterial({
           color: 0xF4A23B,
           transparent: true,
-          opacity: 0.10,
+          opacity: 0.06,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         }),
@@ -919,7 +919,7 @@
       }
       _allNodeMeshes = [];
 
-      const sphereGeom = new THREE.SphereGeometry(0.05, 12, 12);
+      const sphereGeom = new THREE.SphereGeometry(0.10, 14, 14);
 
       // For each category → each node → place a small sphere
       for (const cat of data.categories || []) {
@@ -997,7 +997,9 @@
 
       // Direction from origin through the (scale-corrected) region center
       // with per-node jitter so the cluster spreads across the zone.
-      const jitter = 0.25;
+      // Larger jitter = nodes spread further apart and are easier to pick
+      // out individually when you zoom in.
+      const jitter = 0.55;
       const target = new THREE.Vector3(
         region.cx + (Math.random() - 0.5) * jitter,
         region.cy + (Math.random() - 0.5) * jitter,
@@ -1192,7 +1194,7 @@
     // =================================================================
     function setupControls() {
       document.getElementById("zoom-fit").addEventListener("click", () => {
-        camera.position.set(0.0, 0.4, 7.2);
+        camera.position.set(0.0, 0.3, 5.5);
         controls.target.set(0, 0, 0);
         controls.update();
       });
@@ -1254,7 +1256,7 @@
         cy *= _envelopeScale.sy;
         cz *= _envelopeScale.sz;
       }
-      animateCamera(new THREE.Vector3(cx, cy, cz), 3.4);
+      animateCamera(new THREE.Vector3(cx, cy, cz), 1.6);
 
       // Mark active button + show clear
       document.querySelectorAll(".region-pick").forEach(b => {
@@ -1274,7 +1276,7 @@
 
     function clearRegionFocus() {
       _activeRegion = null;
-      animateCamera(new THREE.Vector3(0, 0, 0), 7.2);
+      animateCamera(new THREE.Vector3(0, 0, 0), 5.5);
       document.querySelectorAll(".region-pick.active").forEach(b => b.classList.remove("active"));
       document.getElementById("rail-clear").classList.remove("show");
       for (const m of _allNodeMeshes) m.material.opacity = 0.92;
