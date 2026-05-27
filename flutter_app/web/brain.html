@@ -96,6 +96,20 @@
     }
     #brain-canvas:active { cursor: grabbing; }
 
+    .diag-hud {
+      position: absolute;
+      top: 70px; right: 16px;
+      font-size: 10px;
+      font-family: ui-monospace, monospace;
+      color: var(--cyan);
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      opacity: 0.5;
+      pointer-events: none;
+      text-align: right;
+      line-height: 1.6;
+    }
+
     .viewport-hint {
       position: absolute; bottom: 18px; left: 50%;
       transform: translateX(-50%);
@@ -383,6 +397,7 @@
     <div class="brain-viewport" id="viewport">
       <canvas id="brain-canvas"></canvas>
       <div class="node-tip" id="tip"><div class="tip-label"></div><div class="tip-region"></div></div>
+      <div class="diag-hud" id="diag"></div>
       <div class="region-rail" id="region-rail">
         <div class="rail-head">Regions</div>
       </div>
@@ -846,6 +861,8 @@
     let _selected = null;
     let _data = null;
     const tip = document.getElementById("tip");
+    const _diagEl = document.getElementById("diag");
+    let _diagFrame = 0;
     const hint = document.getElementById("hint");
 
     // Hide drag-hint after first interaction
@@ -985,7 +1002,7 @@
     //   SHELL_SURFACE = how far out the EXPANDED position sits. 1.0 puts
     //                   nodes right on the envelope; >1.0 explodes past it.
     const SHELL_DEEP    = 0.35;
-    const SHELL_SURFACE = 2.50;
+    const SHELL_SURFACE = 5.50;
 
     // Angular spread (in tangent-plane units, ~radians for small values)
     // around the region's center direction. CLUSTER_SPREAD is the cone
@@ -993,7 +1010,7 @@
     // is the cone half-angle at full zoom-in -- bigger = wider arc of
     // nodes visibly fanning out across the brain surface.
     const CLUSTER_SPREAD = 0.15;
-    const EXPAND_SPREAD  = 0.85;
+    const EXPAND_SPREAD  = 0.40;
 
     // Node scale interpolation. Keep max modest so nodes don't visually
     // overlap when spread out -- the drama comes from the angular spread,
@@ -1392,6 +1409,12 @@
         (ZOOM_FAR - camDist) / (ZOOM_FAR - ZOOM_NEAR),
         0, 1,
       );
+      // Diagnostic HUD — verifies expansion is wired (top-right corner)
+      _diagFrame++;
+      if (_diagFrame % 10 === 0 && _diagEl) {
+        _diagEl.textContent =
+          `dist ${camDist.toFixed(2)}  ·  expand ${(expandT*100).toFixed(0)}%`;
+      }
       const nodeScale = NODE_SCALE_MIN + (NODE_SCALE_MAX - NODE_SCALE_MIN) * expandT;
 
       for (let i = 0; i < _allNodeMeshes.length; i++) {
