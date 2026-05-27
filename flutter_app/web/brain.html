@@ -680,6 +680,15 @@
         // with its own holographic look, and our amber override was killing
         // that. We do NOT traverse + replace materials anymore.
 
+        // Align the model's anterior-posterior axis with our world X axis.
+        // The Oxterium model has its long axis (3.30 units) on Z, but our
+        // node region coordinates assume +X = anterior, -X = posterior.
+        // Rotation.y = +PI/2 sends +Z -> +X, so the model's "front" becomes
+        // our world "right" (typical anatomical-side-view convention).
+        // If the brain ends up backwards on screen, flip the sign.
+        realBrain.rotation.y = Math.PI / 2;
+        realBrain.updateMatrixWorld(true);
+
         // Normalize scale + center: the Sketchfab model comes in arbitrary
         // units / off-center. Scale so longest axis = 3.3, then recenter.
         const box = new THREE.Box3().setFromObject(realBrain);
@@ -689,6 +698,7 @@
         const scale = 3.3 / longest;
         realBrain.scale.setScalar(scale);
         realBrain.position.sub(center.multiplyScalar(scale));
+        realBrain.updateMatrixWorld(true);
 
         // Swap: drop the procedural cortex/cerebellum/stem, add the real one.
         brainGroup.remove(cortex);
