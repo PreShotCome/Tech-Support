@@ -128,11 +128,41 @@
       fill: var(--sage); font-size: 10px;
       letter-spacing: 1.5px; text-transform: uppercase;
       pointer-events: none;
-      opacity: 0.55;
+      opacity: 0.45;
       transition: opacity 220ms;
     }
     .anatomy.region:hover + .region-label,
     .anatomy.region.active + .region-label { opacity: 1; fill: var(--gold); }
+
+    /* cortex silhouette — unified brain outline that contains lobes */
+    .cortex-outline {
+      fill: none;
+      stroke: rgba(91, 192, 235, 0.70);
+      stroke-width: 2.2;
+      stroke-linejoin: round;
+      filter: url(#brainGlow);
+      pointer-events: none;
+    }
+    .cortex-fill {
+      fill: rgba(91, 192, 235, 0.025);
+      pointer-events: none;
+    }
+    /* sylvian fissure — diagonal separator between temporal & frontal/parietal */
+    .fissure {
+      fill: none;
+      stroke: rgba(91, 192, 235, 0.55);
+      stroke-width: 1.6;
+      stroke-linecap: round;
+      pointer-events: none;
+    }
+    /* gyri — decorative wavy lines for cortex texture */
+    .gyrus {
+      fill: none;
+      stroke: rgba(91, 192, 235, 0.22);
+      stroke-width: 0.9;
+      stroke-linecap: round;
+      pointer-events: none;
+    }
 
     /* pathways (links) */
     .pathway {
@@ -358,116 +388,157 @@
             <stop offset="60%" stop-color="#F4A23B" stop-opacity="0.12"/>
             <stop offset="100%" stop-color="#F4A23B" stop-opacity="0"/>
           </radialGradient>
+
+          <!-- Cortex clip path — every cortical lobe is clipped to this so
+               the lobes appear as sections of one brain rather than free
+               floating ovals. Cerebellum + brain stem are NOT clipped;
+               they're anatomically separate structures. -->
+          <clipPath id="cortex-clip">
+            <path d="
+              M 130,365
+              C 100,280 130,185 220,138
+              C 320,102 440,95  540,98
+              C 660,102 760,135 825,205
+              C 880,265 895,345 865,410
+              C 835,470 770,492 700,488
+              C 660,487 638,495 612,508
+              C 555,530 490,535 425,528
+              C 350,520 265,500 195,468
+              C 150,445 120,415 125,380
+              Z"/>
+          </clipPath>
         </defs>
 
         <!-- Camera group (everything zoomed/panned) -->
         <g id="camera">
 
           <!-- ============================================================
-               BRAIN SILHOUETTE
-               Stylized side view, facing right. Coords roughly:
-                 x 100..900 horizontal span
-                 y 100..700 vertical span
-               Each lobe is its own clickable region.
+               BRAIN SILHOUETTE — side view, right-facing.
+               One unified cortex outline contains seven cortical lobes
+               (frontal, motor, parietal, occipital, temporal, broca,
+               wernicke) clipped to the cortex shape. Cerebellum, brain
+               stem, and limbic are separate structures.
           ============================================================ -->
 
-          <!-- Frontal lobe — top-front, executive function -->
-          <path class="anatomy region" data-region="frontal" d="
-            M 200,210
-            C 130,210 90,300 110,380
-            C 130,420 200,440 290,430
-            C 360,420 400,360 400,300
-            C 400,240 340,210 270,205
+          <!-- Cortex backdrop fill (subtle base color under the lobes) -->
+          <path class="cortex-fill" d="
+            M 130,365
+            C 100,280 130,185 220,138
+            C 320,102 440,95  540,98
+            C 660,102 760,135 825,205
+            C 880,265 895,345 865,410
+            C 835,470 770,492 700,488
+            C 660,487 638,495 612,508
+            C 555,530 490,535 425,528
+            C 350,520 265,500 195,468
+            C 150,445 120,415 125,380
             Z"/>
-          <text class="region-label" x="220" y="320" text-anchor="middle">Frontal — Voice / Identity</text>
 
-          <!-- Broca's area — speech production / structured skills -->
-          <path class="anatomy region" data-region="broca" d="
-            M 175,400
-            C 145,415 130,445 145,475
-            C 165,500 215,505 245,488
-            C 270,470 270,440 250,420
-            C 230,400 200,395 175,400
+          <!-- Lobe regions — drawn as overlapping rectangles, clipped to
+               the cortex shape. Order matters: later lobes paint on top. -->
+          <g clip-path="url(#cortex-clip)">
+
+            <!-- Frontal lobe (front-left wedge) -->
+            <path class="anatomy region" data-region="frontal" d="
+              M 60,80 L 425,80 L 425,560 L 60,560 Z"/>
+            <text class="region-label" x="245" y="300" text-anchor="middle">Frontal — Voice / Identity</text>
+
+            <!-- Motor strip (narrow vertical band along the central sulcus) -->
+            <path class="anatomy region" data-region="motor" d="
+              M 425,80 L 500,80 L 500,560 L 425,560 Z"/>
+            <text class="region-label" x="462" y="155" text-anchor="middle">Motor</text>
+
+            <!-- Parietal lobe (top-middle, between motor strip & occipital) -->
+            <path class="anatomy region" data-region="parietal" d="
+              M 500,80 L 730,80 L 730,418 L 500,418 Z"/>
+            <text class="region-label" x="610" y="260" text-anchor="middle">Parietal — Memory</text>
+
+            <!-- Occipital lobe (back wedge) -->
+            <path class="anatomy region" data-region="occipital" d="
+              M 730,80 L 970,80 L 970,520 L 730,520 Z"/>
+            <text class="region-label" x="800" y="310" text-anchor="middle">Occipital — Vision</text>
+
+            <!-- Temporal lobe (lower-front, below the Sylvian fissure) -->
+            <path class="anatomy region" data-region="temporal" d="
+              M 60,418 L 700,418 L 700,560 L 60,560 Z"/>
+            <text class="region-label" x="430" y="490" text-anchor="middle">Temporal — Episodic Memory</text>
+
+            <!-- Broca's area (lower-front of frontal lobe) — drawn ON TOP -->
+            <path class="anatomy region" data-region="broca" d="
+              M 155,422 L 295,422 L 295,495 L 155,495 Z"/>
+            <text class="region-label" x="225" y="462" text-anchor="middle">Broca — Skills</text>
+
+            <!-- Wernicke's area (upper-back of temporal) — drawn ON TOP -->
+            <path class="anatomy region" data-region="wernicke" d="
+              M 540,420 L 650,420 L 650,478 L 540,478 Z"/>
+            <text class="region-label" x="595" y="455" text-anchor="middle">Wernicke — Research</text>
+
+            <!-- Decorative gyri — wavy parallel lines for the wrinkled
+                 cortex look. pointer-events: none so they don't block clicks. -->
+            <g class="gyri">
+              <path class="gyrus" d="M 170,175 Q 230,150 290,175 T 410,175 T 530,175 T 650,175 T 770,175"/>
+              <path class="gyrus" d="M 140,240 Q 210,215 280,240 T 420,240 T 560,240 T 700,240 T 830,240"/>
+              <path class="gyrus" d="M 130,310 Q 210,285 290,310 T 450,310 T 610,310 T 770,310 T 870,310"/>
+              <path class="gyrus" d="M 145,380 Q 230,355 315,380 T 485,380 T 655,380 T 825,380"/>
+              <path class="gyrus" d="M 180,460 Q 260,435 340,460 T 500,460 T 660,460 T 800,460"/>
+              <path class="gyrus" d="M 240,510 Q 320,490 400,510 T 560,510 T 680,510"/>
+            </g>
+          </g>
+
+          <!-- Sylvian fissure — bold diagonal curve separating temporal
+               (below) from frontal/parietal (above). Drawn on top of lobes. -->
+          <path class="fissure" d="
+            M 145,418
+            C 270,398 440,398 600,418
+            C 660,428 700,440 740,460"/>
+
+          <!-- Cortex outline stroke — the unified brain silhouette,
+               drawn LAST so it sits on top and frames the whole shape. -->
+          <path class="cortex-outline" d="
+            M 130,365
+            C 100,280 130,185 220,138
+            C 320,102 440,95  540,98
+            C 660,102 760,135 825,205
+            C 880,265 895,345 865,410
+            C 835,470 770,492 700,488
+            C 660,487 638,495 612,508
+            C 555,530 490,535 425,528
+            C 350,520 265,500 195,468
+            C 150,445 120,415 125,380
             Z"/>
-          <text class="region-label" x="195" y="455" text-anchor="middle">Broca — Skills</text>
 
-          <!-- Parietal lobe — top-middle, memory + integration -->
-          <path class="anatomy region" data-region="parietal" d="
-            M 400,180
-            C 420,160 500,150 600,160
-            C 680,170 720,200 720,260
-            C 720,320 680,360 600,365
-            C 520,370 440,360 400,320
-            C 380,290 380,230 400,180
-            Z"/>
-          <text class="region-label" x="565" y="270" text-anchor="middle">Parietal — Memory</text>
-
-          <!-- Temporal lobe — side-bottom, language comprehension + episodic -->
-          <path class="anatomy region" data-region="temporal" d="
-            M 290,440
-            C 300,510 380,560 470,560
-            C 560,560 640,540 670,500
-            C 690,470 690,440 660,420
-            C 600,410 500,420 420,425
-            C 360,430 310,430 290,440
-            Z"/>
-          <text class="region-label" x="490" y="510" text-anchor="middle">Temporal — Episodic memory</text>
-
-          <!-- Wernicke's area — comprehension, inside temporal -->
-          <path class="anatomy region" data-region="wernicke" d="
-            M 540,430
-            C 525,440 520,460 530,475
-            C 550,490 590,490 605,475
-            C 620,460 615,440 595,430
-            C 575,425 555,425 540,430
-            Z"/>
-          <text class="region-label" x="572" y="465" text-anchor="middle">Wernicke — Research</text>
-
-          <!-- Occipital lobe — vision, back -->
-          <path class="anatomy region" data-region="occipital" d="
-            M 720,200
-            C 790,205 840,250 845,310
-            C 845,360 810,395 745,395
-            C 705,395 685,380 695,330
-            C 700,290 710,240 720,200
-            Z"/>
-          <text class="region-label" x="775" y="305" text-anchor="middle">Occipital — Vision</text>
-
-          <!-- Motor cortex — top center, action surfaces -->
-          <path class="anatomy region" data-region="motor" d="
-            M 370,140
-            C 400,110 470,100 540,105
-            C 600,110 640,130 645,170
-            C 645,200 600,205 540,200
-            C 470,195 400,190 375,180
-            C 365,165 365,150 370,140
-            Z"/>
-          <text class="region-label" x="510" y="160" text-anchor="middle">Motor — Tools</text>
-
-          <!-- Cerebellum — back-bottom, drift / procedural caution -->
+          <!-- Cerebellum — separate cauliflower at back-bottom -->
           <path class="anatomy region" data-region="cerebellum" d="
-            M 700,510
-            C 730,505 800,510 830,540
-            C 850,570 845,610 805,625
-            C 760,635 700,625 685,595
-            C 675,565 685,525 700,510
+            M 685,500
+            C 720,495 800,505 845,545
+            C 875,575 875,625 830,648
+            C 770,668 695,655 665,620
+            C 638,585 645,520 685,500
             Z"/>
-          <text class="region-label" x="765" y="580" text-anchor="middle">Cerebellum — Drift</text>
+          <text class="region-label" x="765" y="585" text-anchor="middle">Cerebellum — Drift</text>
 
-          <!-- Brain stem — bottom, Layer 1 core -->
+          <!-- Cerebellum inner fold lines (the cauliflower texture) -->
+          <g class="cerebellum-folds" style="pointer-events:none">
+            <path class="gyrus" d="M 680,525 Q 720,510 770,525 T 845,535"/>
+            <path class="gyrus" d="M 668,560 Q 720,545 780,560 T 855,575"/>
+            <path class="gyrus" d="M 665,595 Q 720,580 780,595 T 845,615"/>
+            <path class="gyrus" d="M 685,630 Q 740,615 795,630 T 840,640"/>
+          </g>
+
+          <!-- Brain stem — narrow tube descending from cortex base -->
           <path class="anatomy stem region" data-region="brainstem" d="
-            M 470,560
-            C 475,590 480,640 490,690
-            C 500,720 550,720 560,690
-            C 570,640 575,590 580,560
-            C 560,555 490,555 470,560
+            M 480,520
+            C 478,560 478,620 488,680
+            C 498,718 552,718 562,680
+            C 572,620 572,560 570,520
+            C 555,515 495,515 480,520
             Z"/>
-          <text class="region-label" x="525" y="660" text-anchor="middle">Brain stem — Core</text>
+          <text class="region-label" x="525" y="650" text-anchor="middle">Brain stem — Core</text>
 
-          <!-- Limbic system — deep center, personality / self / human / narrative -->
-          <ellipse cx="500" cy="380" rx="120" ry="65" fill="url(#limbicGlow)" filter="url(#brainGlow)"/>
-          <ellipse class="anatomy limbic region" data-region="limbic" cx="500" cy="380" rx="115" ry="62"/>
-          <text class="region-label" x="500" y="385" text-anchor="middle">Limbic — Self / Human / Narrative</text>
+          <!-- Limbic system — deep inner structure, drawn over the cortex -->
+          <ellipse cx="500" cy="380" rx="120" ry="60" fill="url(#limbicGlow)" filter="url(#brainGlow)"/>
+          <ellipse class="anatomy limbic region" data-region="limbic" cx="500" cy="380" rx="115" ry="57"/>
+          <text class="region-label" x="500" y="384" text-anchor="middle">Limbic — Self / Human / Narrative</text>
 
           <!-- Pathway and node groups (populated by JS) -->
           <g id="pathways"></g>
