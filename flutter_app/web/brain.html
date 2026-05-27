@@ -257,6 +257,92 @@
       color: var(--cyan);
     }
 
+    /* ---------- TRON-STYLE REGION SELECTORS ---------- */
+    .region-rail {
+      position: absolute;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex; flex-direction: column;
+      gap: 5px;
+      z-index: 8;
+      pointer-events: none;
+    }
+    .region-rail > * { pointer-events: auto; }
+
+    .region-rail .rail-head {
+      font-size: 9px;
+      letter-spacing: 2.5px;
+      color: var(--cyan);
+      text-transform: uppercase;
+      padding: 4px 10px;
+      margin-bottom: 4px;
+      opacity: 0.6;
+    }
+
+    .region-pick {
+      --region-color: #5BC0EB;
+      background: rgba(7, 9, 13, 0.55);
+      border: 1px solid rgba(91, 192, 235, 0.22);
+      border-left: 2px solid var(--region-color);
+      color: var(--sage);
+      padding: 7px 14px 7px 12px;
+      text-align: left;
+      font-family: inherit;
+      font-size: 10px;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 180ms;
+      min-width: 215px;
+      backdrop-filter: blur(8px);
+      position: relative;
+      clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+    }
+    .region-pick::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 2px;
+      background: var(--region-color);
+      box-shadow: 0 0 8px var(--region-color);
+      opacity: 0.55;
+    }
+    .region-pick:hover {
+      color: var(--text);
+      background: rgba(13, 18, 25, 0.85);
+      letter-spacing: 1.8px;
+      transform: translateX(2px);
+    }
+    .region-pick:hover::before { opacity: 1; }
+    .region-pick.active {
+      color: var(--region-color);
+      background: rgba(13, 18, 25, 0.92);
+      border-color: var(--region-color);
+      letter-spacing: 1.8px;
+    }
+    .region-pick.active::before { opacity: 1; box-shadow: 0 0 14px var(--region-color); }
+
+    .rail-clear {
+      align-self: flex-start;
+      background: rgba(7, 9, 13, 0.55);
+      border: 1px solid rgba(230, 184, 92, 0.35);
+      color: var(--gold);
+      padding: 6px 12px;
+      font-family: inherit;
+      font-size: 9px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      margin-top: 6px;
+      transition: all 180ms;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .rail-clear.show { opacity: 1; pointer-events: auto; }
+    .rail-clear:hover { background: rgba(230, 184, 92, 0.15); }
+
     /* region label overlay (HTML, projected from 3D) */
     .region-label-overlay {
       position: absolute;
@@ -297,6 +383,9 @@
     <div class="brain-viewport" id="viewport">
       <canvas id="brain-canvas"></canvas>
       <div class="node-tip" id="tip"><div class="tip-label"></div><div class="tip-region"></div></div>
+      <div class="region-rail" id="region-rail">
+        <div class="rail-head">Regions</div>
+      </div>
       <div class="viewport-hint" id="hint">drag · rotate &nbsp; · &nbsp; scroll · zoom &nbsp; · &nbsp; click · inspect</div>
       <div class="empty-state" id="empty" style="display:none">
         No <code>brain.json</code> found.<br/><br/>
@@ -452,9 +541,9 @@
     composer.addPass(new RenderPass(scene, camera));
     const bloom = new UnrealBloomPass(
       new THREE.Vector2(1, 1),
-      0.55,   // strength (lower = less halo bleed)
-      0.70,   // radius
-      0.28,   // threshold (higher = only brighter pixels bloom)
+      0.30,   // strength (lower = less halo bleed)
+      0.65,   // radius
+      0.45,   // threshold (higher = only brighter pixels bloom)
     );
     composer.addPass(bloom);
 
@@ -616,38 +705,27 @@
     function buildLimbicCore() {
       const g = new THREE.Group();
       const inner = new THREE.Mesh(
-        new THREE.SphereGeometry(0.36, 32, 32),
+        new THREE.SphereGeometry(0.22, 32, 32),
         new THREE.MeshBasicMaterial({
           color: 0xFFD27A,
           transparent: true,
-          opacity: 0.85,
+          opacity: 0.45,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         }),
       );
       const outer = new THREE.Mesh(
-        new THREE.SphereGeometry(0.62, 32, 32),
+        new THREE.SphereGeometry(0.38, 32, 32),
         new THREE.MeshBasicMaterial({
           color: 0xF4A23B,
           transparent: true,
-          opacity: 0.18,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        }),
-      );
-      const halo = new THREE.Mesh(
-        new THREE.SphereGeometry(1.05, 32, 32),
-        new THREE.MeshBasicMaterial({
-          color: 0xF4A23B,
-          transparent: true,
-          opacity: 0.05,
+          opacity: 0.10,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         }),
       );
       g.add(inner);
       g.add(outer);
-      g.add(halo);
       g.position.set(0.05, 0.05, 0);
       return g;
     }
@@ -797,6 +875,7 @@
       setupSearch();
       setupCloseButton();
       setupControls();
+      setupRegionRail();
     }
 
     function populatePortrait(data) {
@@ -1045,6 +1124,95 @@
         autoRotateOn = !autoRotateOn;
         controls.autoRotate = autoRotateOn;
       });
+    }
+
+    // =================================================================
+    // REGION RAIL — Tron-style left-side selectors
+    // =================================================================
+    let _activeRegion = null;
+
+    function setupRegionRail() {
+      const rail = document.getElementById("region-rail");
+      // Order matters here — anatomical ordering top-to-bottom
+      const order = [
+        "frontal", "broca", "motor", "parietal",
+        "wernicke", "temporal", "occipital",
+        "limbic", "cerebellum", "brainstem",
+      ];
+      for (const id of order) {
+        const r = REGIONS[id];
+        const hex = "#" + REGION_COLOR[id].toString(16).padStart(6, "0");
+        const btn = document.createElement("button");
+        btn.className = "region-pick";
+        btn.dataset.region = id;
+        btn.style.setProperty("--region-color", hex);
+        btn.textContent = r.label;
+        btn.addEventListener("click", () => {
+          if (_activeRegion === id) clearRegionFocus();
+          else focusRegion(id);
+        });
+        rail.appendChild(btn);
+      }
+      const clear = document.createElement("button");
+      clear.className = "rail-clear";
+      clear.id = "rail-clear";
+      clear.textContent = "Show all";
+      clear.addEventListener("click", clearRegionFocus);
+      rail.appendChild(clear);
+    }
+
+    function focusRegion(id) {
+      _activeRegion = id;
+      const r = REGIONS[id];
+      let cx = r.cx, cy = r.cy, cz = r.cz;
+      if (_envelopeScale) {
+        cx *= _envelopeScale.sx;
+        cy *= _envelopeScale.sy;
+        cz *= _envelopeScale.sz;
+      }
+      animateCamera(new THREE.Vector3(cx, cy, cz), 3.4);
+
+      // Mark active button + show clear
+      document.querySelectorAll(".region-pick").forEach(b => {
+        b.classList.toggle("active", b.dataset.region === id);
+      });
+      document.getElementById("rail-clear").classList.add("show");
+
+      // Dim other regions' nodes
+      for (const m of _allNodeMeshes) {
+        const matched = m.userData.region === id;
+        m.material.opacity = matched ? 1.0 : 0.10;
+      }
+
+      // Pause auto-rotate while focused
+      controls.autoRotate = false;
+    }
+
+    function clearRegionFocus() {
+      _activeRegion = null;
+      animateCamera(new THREE.Vector3(0, 0, 0), 7.2);
+      document.querySelectorAll(".region-pick.active").forEach(b => b.classList.remove("active"));
+      document.getElementById("rail-clear").classList.remove("show");
+      for (const m of _allNodeMeshes) m.material.opacity = 0.92;
+      controls.autoRotate = autoRotateOn;
+    }
+
+    function animateCamera(targetPos, distance) {
+      const startTarget = controls.target.clone();
+      const startCam    = camera.position.clone();
+      const dir = camera.position.clone().sub(controls.target).normalize();
+      const newCam = targetPos.clone().add(dir.multiplyScalar(distance));
+      const startTime = performance.now();
+      const duration = 700;
+      function step() {
+        const t = Math.min(1, (performance.now() - startTime) / duration);
+        const eased = t * t * (3 - 2 * t); // smoothstep
+        controls.target.lerpVectors(startTarget, targetPos, eased);
+        camera.position.lerpVectors(startCam, newCam, eased);
+        controls.update();
+        if (t < 1) requestAnimationFrame(step);
+      }
+      step();
     }
 
     // =================================================================
