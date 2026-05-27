@@ -934,15 +934,17 @@
             opacity: 0.92,
           });
           const mesh = new THREE.Mesh(sphereGeom, mat);
-          const p = placeNode(regionId, region);
-          mesh.position.copy(p);
+          const { cluster, expand } = computeNodePositions(regionId, region);
+          mesh.position.copy(cluster);
           mesh.userData = {
             data: n,
             region: regionId,
             categoryLabel: cat.label,
             baseColor: colorHex,
             baseScale: 1.0,
-            basePosition: p.clone(),
+            clusterPos: cluster.clone(),
+            expandPos:  expand.clone(),
+            basePosition: cluster.clone(),  // updated each frame to current lerp result
           };
           nodesGroup.add(mesh);
           _allNodeMeshes.push(mesh);
@@ -975,70 +977,79 @@
     const _INSIDE_REGIONS = new Set(["limbic", "brainstem"]);
     const _surfaceRay = new THREE.Raycaster();
 
-    // Pick a position for a node.
-    //   Inside regions (limbic, brainstem) -> volumetric ellipsoid sample.
-    //   Cortical regions, GLB not yet loaded -> volumetric.
-    //   Cortical regions, GLB loaded -> try raycast (works for triangle
-    //     meshes); if no hit (e.g. the model is a point cloud), fall
-    //     back to "snap to brain envelope surface" via ellipsoid math.
-    function placeNode(regionId, region) {
-      const volumetric = () => {
-        const v = randomPositionInRegion(region);
-        if (_envelopeScale) {
-          v.x *= _envelopeScale.sx;
-          v.y *= _envelopeScale.sy;
-          v.z *= _envelopeScale.sz;
-        }
-        return v;
-      };
-      if (!loadedBrain || _INSIDE_REGIONS.has(regionId)) {
-        return volumetric();
-      }
+    // Depth tuning for cortical nodes:
+    //   SHELL_DEEP    = how far out (as a fraction of the bounding
+    //                   ellipsoid radius) the CLUSTERED position sits.
+    //                   Lower = deeper inside the brain. Brains aren't
+    //                   perfect ellipsoids, so 0.5 sits inside the bulk.
+    //   SHELL_SURFACE = how far out the EXPANDED position sits, ideally
+    //                   near the visible point-cloud surface.
+    const SHELL_DEEP    = 0.50;
+    const SHELL_SURFACE = 0.78;
 
-      // Direction from origin through the (scale-corrected) region center
-      // with per-node jitter so the cluster spreads across the zone.
-      // Larger jitter = nodes spread further apart and are easier to pick
-      // out individually when you zoom in.
-      const jitter = 0.55;
+    // Math helper: ray from origin in `dir` (unit vector) hits the
+    // brain's bounding ellipsoid at distance t. Solve (x/a)^2+(y/b)^2+(z/c)^2=1.
+    function ellipsoidT(dir) {
+      const a = 3.3 / 2;
+      const b = 1.9 * (_envelopeScale?.sy || 1) / 2;
+      const c = 2.1 * (_envelopeScale?.sz || 1) / 2;
+      const denom = (dir.x/a)**2 + (dir.y/b)**2 + (dir.z/c)**2;
+      return 1 / Math.sqrt(Math.max(denom, 1e-9));
+    }
+
+    // Surface-relative position: pick a direction (region center + jitter),
+    // walk out to `factor * envelope_radius` along it.
+    function surfacePosition(region, factor, jitterAmt) {
       const target = new THREE.Vector3(
-        region.cx + (Math.random() - 0.5) * jitter,
-        region.cy + (Math.random() - 0.5) * jitter,
-        region.cz + (Math.random() - 0.5) * jitter,
+        region.cx + (Math.random() - 0.5) * jitterAmt,
+        region.cy + (Math.random() - 0.5) * jitterAmt,
+        region.cz + (Math.random() - 0.5) * jitterAmt,
       );
       if (_envelopeScale) {
         target.x *= _envelopeScale.sx;
         target.y *= _envelopeScale.sy;
         target.z *= _envelopeScale.sz;
       }
-      if (target.lengthSq() < 0.0001) return volumetric();
-      const dir = target.clone().normalize();
-
-      // First try raycaster against the loaded brain. If the model is a
-      // triangle mesh, this gives us the EXACT surface point.
-      const farPoint = dir.clone().multiplyScalar(5);
-      const dirIn = dir.clone().negate();
-      _surfaceRay.set(farPoint, dirIn);
-      _surfaceRay.far = 10;
-      const hits = _surfaceRay.intersectObject(loadedBrain, true);
-      if (hits.length > 0) {
-        return hits[0].point.clone().multiplyScalar(1.02);
+      if (target.lengthSq() < 0.0001) {
+        return new THREE.Vector3(region.cx, region.cy, region.cz);
       }
+      const dir = target.clone().normalize();
+      return dir.multiplyScalar(ellipsoidT(dir) * factor);
+    }
 
-      // Raycast missed (model is a point cloud or non-triangle). Snap
-      // to the brain's bounding ellipsoid surface using analytical math.
-      // Ellipsoid: (x/a)^2 + (y/b)^2 + (z/c)^2 = 1 where a,b,c are the
-      // half-extents of the real brain envelope.
-      const a = 3.3 / 2;
-      const b = 1.9 * (_envelopeScale?.sy || 1) / 2;
-      const c = 2.1 * (_envelopeScale?.sz || 1) / 2;
-      const denom = (dir.x/a)**2 + (dir.y/b)**2 + (dir.z/c)**2;
-      if (denom < 1e-9) return volumetric();
-      // t = distance from origin along dir to the ellipsoid surface
-      const t = 1 / Math.sqrt(denom);
-      // Land at 92-100% of the way out so nodes sit ON the shell with
-      // a touch of depth variation
-      const factor = 0.92 + Math.random() * 0.08;
-      return dir.clone().multiplyScalar(t * factor);
+    // For each node, compute BOTH a clustered position (deep inside the
+    // brain, tight to its region's anchor) and an expanded position
+    // (near the surface, spread wider across the region). In the animate
+    // loop we lerp between them based on camera zoom.
+    function computeNodePositions(regionId, region) {
+      // Deep structures: cluster very tight, expand to fill region volume
+      if (_INSIDE_REGIONS.has(regionId) || !loadedBrain) {
+        const tight = randomPositionInRegion({
+          ...region,
+          rx: region.rx * 0.25,
+          ry: region.ry * 0.25,
+          rz: region.rz * 0.25,
+        });
+        const full = randomPositionInRegion(region);
+        if (_envelopeScale) {
+          tight.x *= _envelopeScale.sx; tight.y *= _envelopeScale.sy; tight.z *= _envelopeScale.sz;
+          full.x  *= _envelopeScale.sx; full.y  *= _envelopeScale.sy; full.z  *= _envelopeScale.sz;
+        }
+        return { cluster: tight, expand: full };
+      }
+      // Cortical regions: cluster deep, expand to surface, wider jitter
+      // on expand for the "detail emerges as you zoom" effect.
+      return {
+        cluster: surfacePosition(region, SHELL_DEEP,    0.20),
+        expand:  surfacePosition(region, SHELL_SURFACE, 0.75),
+      };
+    }
+
+    // Legacy entry point — buildNodes still calls placeNode; route it to
+    // computeNodePositions and return the cluster pos as the initial
+    // position (basePosition gets set from this).
+    function placeNode(regionId, region) {
+      return computeNodePositions(regionId, region).cluster;
     }
 
     // Re-place every existing node — called by the GLB success callback
@@ -1057,9 +1068,10 @@
         const regionId = m.userData.region;
         const region = REGIONS[regionId];
         if (!region) continue;
-        const p = placeNode(regionId, region);
-        m.position.copy(p);
-        m.userData.basePosition = p.clone();
+        const { cluster, expand } = computeNodePositions(regionId, region);
+        m.userData.clusterPos = cluster.clone();
+        m.userData.expandPos  = expand.clone();
+        m.position.copy(cluster);
       }
     }
 
@@ -1312,18 +1324,27 @@
       const pulse = 1 + Math.sin(t * 1.4) * 0.04;
       limbicCore.scale.setScalar(pulse);
 
-      // Subtle node bobbing — adds life. Skipped when a region is focused
-      // (Ian wants nodes static along with the brain in focus mode) or
-      // when the user is dragging the brain.
-      if (!_activeRegion && !userInteracting) {
-        for (let i = 0; i < _allNodeMeshes.length; i++) {
-          const m = _allNodeMeshes[i];
-          if (m === _hovered || m === _selected) continue;
-          const base = m.userData.basePosition;
-          if (!base) continue;
+      // Zoom-driven cluster <-> expand interpolation. As the camera
+      // approaches the brain, nodes spread out from their clustered
+      // positions to their expanded positions (detail emerges, Iron Man
+      // style). Lerp t = 0 when far away, 1 when right up close.
+      const camDist = camera.position.distanceTo(controls.target);
+      const expandT = THREE.MathUtils.clamp(1 - (camDist - 1.5) / 3.5, 0, 1);
+
+      for (let i = 0; i < _allNodeMeshes.length; i++) {
+        const m = _allNodeMeshes[i];
+        if (m === _hovered || m === _selected) continue;
+        const c = m.userData.clusterPos;
+        const e = m.userData.expandPos;
+        if (!c || !e) continue;
+        // Base position = lerp(cluster, expand, t)
+        m.position.lerpVectors(c, e, expandT);
+        m.userData.basePosition.copy(m.position);
+        // Subtle bob on top — skip when focused or dragging
+        if (!_activeRegion && !userInteracting) {
           const phase = i * 0.17;
-          m.position.x = base.x + Math.sin(t * 0.6 + phase) * 0.006;
-          m.position.y = base.y + Math.cos(t * 0.5 + phase) * 0.004;
+          m.position.x += Math.sin(t * 0.6 + phase) * 0.006;
+          m.position.y += Math.cos(t * 0.5 + phase) * 0.004;
         }
       }
 
