@@ -971,24 +971,30 @@
       }
       _allNodeMeshes = [];
 
-      const sphereGeom = new THREE.SphereGeometry(0.10, 14, 14);
+      // Build the glow texture once and share it across every node.
+      // Soft radial gradient -> additive blending gives the Tron/Jarvis
+      // energy-orb look. Sprites always face the camera so they read as
+      // glowing dots from any angle.
+      const glowTex = _nodeGlowTexture();
 
-      // For each category → each node → place a small sphere
       for (const cat of data.categories || []) {
         const regionId = CATEGORY_TO_REGION[cat.id] || "limbic";
         const region   = REGIONS[regionId];
         const colorHex = REGION_COLOR[regionId] || 0xE6B85C;
         if (!region) continue;
         for (const n of (cat.nodes || [])) {
-          const mat = new THREE.MeshBasicMaterial({
+          const mat = new THREE.SpriteMaterial({
+            map: glowTex,
             color: colorHex,
             transparent: true,
-            opacity: 0.92,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
           });
-          const mesh = new THREE.Mesh(sphereGeom, mat);
+          const sprite = new THREE.Sprite(mat);
+          sprite.scale.set(0.42, 0.42, 0.42);
           const { cluster, expand } = computeNodePositions(regionId, region);
-          mesh.position.copy(cluster);
-          mesh.userData = {
+          sprite.position.copy(cluster);
+          sprite.userData = {
             data: n,
             region: regionId,
             categoryLabel: cat.label,
@@ -996,12 +1002,34 @@
             baseScale: 1.0,
             clusterPos: cluster.clone(),
             expandPos:  expand.clone(),
-            basePosition: cluster.clone(),  // updated each frame to current lerp result
+            basePosition: cluster.clone(),
           };
-          nodesGroup.add(mesh);
-          _allNodeMeshes.push(mesh);
+          nodesGroup.add(sprite);
+          _allNodeMeshes.push(sprite);
         }
       }
+    }
+
+    // Build a soft-glow circular texture for node sprites. Radial
+    // gradient with a defined bright core and long soft falloff, drawn
+    // once on a canvas and uploaded as a Three.js texture.
+    let _glowTexCached = null;
+    function _nodeGlowTexture() {
+      if (_glowTexCached) return _glowTexCached;
+      const c = document.createElement("canvas");
+      c.width = c.height = 128;
+      const ctx = c.getContext("2d");
+      const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+      g.addColorStop(0.00, "rgba(255,255,255,1.00)");
+      g.addColorStop(0.12, "rgba(255,255,255,0.92)");
+      g.addColorStop(0.30, "rgba(255,255,255,0.55)");
+      g.addColorStop(0.55, "rgba(255,255,255,0.18)");
+      g.addColorStop(1.00, "rgba(255,255,255,0.00)");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 128, 128);
+      _glowTexCached = new THREE.CanvasTexture(c);
+      _glowTexCached.colorSpace = THREE.SRGBColorSpace;
+      return _glowTexCached;
     }
 
     function randomPositionInRegion(r) {
@@ -1416,10 +1444,11 @@
 
     function clearRegionFocus() {
       _activeRegion = null;
-      animateCamera(new THREE.Vector3(0, 0, 0), 8.5);
+      _zoomIndex = ZOOM_DEFAULT_INDEX;
+      animateCamera(new THREE.Vector3(0, 0, 0), ZOOM_STEPS[_zoomIndex]);
       document.querySelectorAll(".region-pick.active").forEach(b => b.classList.remove("active"));
       document.getElementById("rail-clear").classList.remove("show");
-      for (const m of _allNodeMeshes) m.material.opacity = 0.92;
+      for (const m of _allNodeMeshes) m.material.opacity = 1.0;
       controls.autoRotate = autoRotateOn;
     }
 
