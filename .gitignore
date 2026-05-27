@@ -44,7 +44,10 @@ python/agent_env/__pycache__/
 .pytest_cache/
 
 # Trained models / artifacts (kept locally, not committed)
-models/
+# Scoped to python/ — the Flutter dashboard has its own lib/modules/*/models/
+# directories that must be committed.
+python/models/
+/models/
 shadow_*.jsonl
 paper_*.jsonl
 decisions.jsonl
@@ -77,3 +80,12 @@ flutter_app/android/.gradle/
 .vscode/
 *.swp
 *~
+
+# Dashboard (Flutter)
+dashboard/.dart_tool/
+dashboard/.flutter-plugins
+dashboard/.flutter-plugins-dependencies
+dashboard/.packages
+dashboard/build/
+dashboard/.pub-cache/
+dashboard/pubspec.lock
