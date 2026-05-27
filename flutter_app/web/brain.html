@@ -563,6 +563,15 @@
     composer.addPass(bloom);
 
     // Controls
+    // Zoom configuration. Used by the wheel handler and the camera-driven
+    // node-expansion lerp. ZOOM_FAR/ZOOM_NEAR define the band over which
+    // expandT ramps 0->1. ZOOM_STEPS is the discrete distance ladder that
+    // each scroll click snaps to.
+    const ZOOM_FAR  = 14.0;
+    const ZOOM_NEAR = 1.0;
+    const ZOOM_STEPS = [22.0, 14.0, 9.0, 5.5, 3.5, 2.0, 1.0];
+    const ZOOM_DEFAULT_INDEX = 1;  // start at 14.0
+
     const controls = new OrbitControls(camera, canvas);
     controls.enableDamping = true;
     controls.dampingFactor = 0.07;
@@ -1087,16 +1096,6 @@
     // to start the moment the user zooms in past default (4.2) so the
     // animation happens during the zoom-in, not lazily across the entire
     // possible zoom range.
-    const ZOOM_FAR  = 14.0;  // default distance, expandT = 0
-    const ZOOM_NEAR = 1.0;   // closest, expandT = 1
-
-    // Discrete zoom steps. Each mouse wheel click snaps to the next step
-    // (smooth animated transition). Removes mushy-scroll feel and makes
-    // each click a visible jump in both camera distance and node
-    // expansion. Sized so the early steps are wide (lots of context) and
-    // later steps are tight (drilling in).
-    const ZOOM_STEPS = [22.0, 14.0, 9.0, 5.5, 3.5, 2.0, 1.0];
-    const ZOOM_DEFAULT_INDEX = 1;  // start at 14.0
 
     // Math helper: ray from origin in `dir` (unit vector) hits the
     // brain's bounding ellipsoid at distance t. Solve (x/a)^2+(y/b)^2+(z/c)^2=1.
