@@ -306,9 +306,32 @@ def collect() -> dict:
     # Drop empty categories so the graph doesn't render lonely hubs
     categories = [c for c in categories if c["nodes"]]
 
+    # Theo's name + voice — for the brain.html portrait panel.
+    name = voice = voice_character = None
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(REPO / "python"))
+        from agent.state import load_name, load_voice
+        name = load_name()
+        voice = load_voice()
+        if voice:
+            try:
+                from agent.tools.identity_tools import VOICE_CANDIDATES
+                for c in VOICE_CANDIDATES:
+                    if c["id"] == voice:
+                        voice_character = c["character"]
+                        break
+            except Exception:
+                pass
+    except Exception:
+        pass
+
     brain = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "identity_version": version,
+        "name":  name,
+        "voice": voice,
+        "voice_character": voice_character,
         "categories": categories,
     }
     brain["stats"] = _stats(brain)

@@ -2,303 +2,911 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=4" />
   <title>Theo — Brain</title>
+  <link rel="icon" type="image/png" href="favicon.png" />
   <style>
     :root {
-      --bg:       #0B0F14;
-      --surface:  #141B22;
-      --surfac2:  #1B232C;
-      --accent:   #B2A4FF;
-      --accent2:  #8276D6;
-      --gold:     #E6B85C;
-      --sage:     #A0B0A6;
-      --danger:   #E57373;
-      --success:  #7BC47F;
-      --text:     #E8ECF0;
+      --bg:        #07090d;
+      --bg-deep:   #02030a;
+      --surface:   #131a23;
+      --surfac2:   #1d2733;
+      --text:      #E8ECF0;
+      --sage:      #A0B0A6;
+      --gold:      #E6B85C;
+      --amber:     #F4A23B;
+      --cyan:      #5BC0EB;
+      --cyan-dim:  #2A6580;
+      --lavender:  #B2A4FF;
+      --green:     #7BC47F;
+      --danger:    #E57373;
+      --violet:    #9D7BCF;
     }
     * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; }
-    body {
-      background: var(--bg);
+    html, body {
+      height: 100%; margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse at 50% 40%, #0e1620 0%, #07090d 60%, #02030a 100%);
       color: var(--text);
       font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
                    Roboto, sans-serif;
-      overflow: hidden;
+      font-feature-settings: "ss01", "cv11";
     }
-    header {
-      position: fixed; top: 0; left: 0; right: 0;
-      padding: 14px 22px 10px;
-      background: linear-gradient(180deg, var(--bg) 60%, transparent);
-      z-index: 5; display: flex; align-items: baseline; gap: 18px;
-    }
-    h1 { margin: 0; font-size: 20px; letter-spacing: 1.2px; }
-    h1 .sub { color: var(--sage); font-size: 12px; margin-left: 8px; }
-    .stats {
-      display: flex; flex-wrap: wrap; gap: 14px; margin-left: auto;
-      color: var(--sage); font-size: 12px;
-    }
-    .stat b { color: var(--accent); font-weight: 600; margin-right: 4px; }
-    main { position: relative; height: 100%; }
-    svg { width: 100vw; height: 100vh; display: block; }
-    .link { stroke: #2A3340; stroke-opacity: 0.65; }
-    .node circle {
-      stroke: var(--bg); stroke-width: 1.4;
-      cursor: pointer; transition: stroke 120ms, r 120ms;
-    }
-    .node:hover circle { stroke: var(--accent); }
-    .node text {
-      fill: var(--sage); font-size: 11px;
-      pointer-events: none;
-      text-shadow: 0 0 4px var(--bg), 0 0 4px var(--bg);
-    }
-    .node.center text { fill: var(--text); font-size: 14px; font-weight: 600; }
-    .node.category text { fill: var(--text); font-size: 12px; font-weight: 600; }
-    .node.selected circle { stroke: var(--gold); stroke-width: 2.5; }
 
+    /* ---------- HEADER ---------- */
+    header.top {
+      position: fixed; top: 0; left: 0; right: 0;
+      padding: 16px 24px 12px;
+      z-index: 20; display: flex; align-items: center; gap: 18px;
+      pointer-events: none;
+    }
+    header.top > * { pointer-events: auto; }
+    h1 {
+      margin: 0; font-size: 18px; letter-spacing: 3px; font-weight: 600;
+      color: var(--text);
+      text-shadow: 0 0 12px rgba(91, 192, 235, 0.35);
+    }
+    h1 .sub {
+      color: var(--sage); font-size: 11px; margin-left: 10px;
+      letter-spacing: 1px;
+    }
+    .search-wrap {
+      margin-left: auto;
+      display: flex; align-items: center;
+      background: rgba(20, 27, 34, 0.85);
+      border: 1px solid var(--surfac2);
+      border-radius: 22px;
+      padding: 0 12px;
+      box-shadow: 0 0 18px rgba(91, 192, 235, 0.1);
+      backdrop-filter: blur(8px);
+    }
+    .search-wrap input {
+      background: transparent; border: none; outline: none;
+      color: var(--text); font-size: 13px;
+      padding: 8px 4px; width: 220px;
+      font-family: inherit;
+    }
+    .search-wrap input::placeholder { color: var(--sage); }
+    .search-wrap svg { width: 14px; height: 14px; color: var(--sage); }
+
+    /* ---------- LAYOUT ---------- */
+    main {
+      position: absolute; inset: 0;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+    }
+    @media (max-width: 800px) {
+      main { grid-template-columns: 1fr; }
+      aside.panel { display: none; }
+      aside.panel.open { display: flex; position: fixed; inset: 0; }
+    }
+
+    /* ---------- BRAIN VIEWPORT ---------- */
+    .brain-viewport {
+      position: relative; overflow: hidden;
+      background: transparent;
+    }
+    svg#brain {
+      width: 100%; height: 100%; display: block;
+      cursor: grab;
+    }
+    svg#brain:active { cursor: grabbing; }
+
+    /* brain anatomy strokes */
+    .anatomy {
+      fill: rgba(91, 192, 235, 0.04);
+      stroke: rgba(91, 192, 235, 0.45);
+      stroke-width: 1.2;
+      stroke-linejoin: round;
+      filter: url(#brainGlow);
+      transition: fill 220ms, stroke 220ms;
+    }
+    .anatomy.region {
+      cursor: pointer;
+      fill: rgba(91, 192, 235, 0.025);
+      stroke: rgba(91, 192, 235, 0.28);
+    }
+    .anatomy.region:hover {
+      fill: rgba(230, 184, 92, 0.06);
+      stroke: rgba(230, 184, 92, 0.55);
+    }
+    .anatomy.region.active {
+      fill: rgba(230, 184, 92, 0.09);
+      stroke: rgba(230, 184, 92, 0.75);
+    }
+    .anatomy.limbic {
+      fill: rgba(244, 162, 59, 0.08);
+      stroke: rgba(244, 162, 59, 0.6);
+    }
+    .anatomy.stem {
+      fill: rgba(244, 228, 181, 0.08);
+      stroke: rgba(244, 228, 181, 0.55);
+    }
+
+    .region-label {
+      fill: var(--sage); font-size: 10px;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      pointer-events: none;
+      opacity: 0.55;
+      transition: opacity 220ms;
+    }
+    .anatomy.region:hover + .region-label,
+    .anatomy.region.active + .region-label { opacity: 1; fill: var(--gold); }
+
+    /* pathways (links) */
+    .pathway {
+      stroke-width: 0.7;
+      fill: none;
+      opacity: 0.55;
+      stroke: rgba(91, 192, 235, 0.4);
+      filter: url(#pathwayGlow);
+    }
+
+    /* nodes */
+    .node circle {
+      stroke: rgba(7, 9, 13, 0.9);
+      stroke-width: 1;
+      cursor: pointer;
+      transition: r 180ms, stroke 180ms, opacity 220ms;
+      filter: url(#nodeGlow);
+    }
+    .node:hover circle {
+      stroke: var(--text);
+      stroke-width: 1.5;
+    }
+    .node.selected circle {
+      stroke: var(--gold);
+      stroke-width: 2.2;
+    }
+    .node text {
+      fill: var(--text);
+      font-size: 9.5px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 180ms;
+      text-shadow: 0 0 6px var(--bg), 0 0 4px var(--bg), 0 0 4px var(--bg);
+    }
+    .node:hover text,
+    .node.selected text,
+    .node.matched text { opacity: 1; }
+    .node.matched circle { stroke: var(--gold); stroke-width: 2; }
+    .node.dimmed circle { opacity: 0.18; }
+    .node.dimmed text { opacity: 0; }
+
+    /* ---------- SIDE PANEL ---------- */
     aside.panel {
-      position: fixed; top: 0; right: 0; bottom: 0;
-      width: min(440px, 92vw);
-      background: var(--surface);
+      background: linear-gradient(180deg,
+        rgba(19, 26, 35, 0.92) 0%,
+        rgba(7, 9, 13, 0.92) 100%);
       border-left: 1px solid var(--surfac2);
-      padding: 56px 22px 22px;
+      padding: 76px 24px 24px;
       overflow-y: auto;
-      transform: translateX(100%);
-      transition: transform 220ms ease;
-      z-index: 10;
-      box-shadow: -8px 0 32px rgba(0,0,0,0.4);
+      display: flex; flex-direction: column; gap: 18px;
+      backdrop-filter: blur(6px);
     }
-    aside.panel.open { transform: translateX(0); }
-    aside.panel .close {
-      position: absolute; top: 12px; right: 14px;
-      background: none; border: none; color: var(--sage);
-      font-size: 22px; cursor: pointer; line-height: 1;
+    .portrait {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px;
+      background: rgba(13, 18, 25, 0.6);
+      border: 1px solid var(--surfac2);
+      border-radius: 12px;
     }
-    aside.panel h2 { margin: 0 0 4px; color: var(--text); font-size: 18px; }
-    aside.panel .meta { color: var(--sage); font-size: 11px; margin-bottom: 16px; }
-    aside.panel pre {
-      background: var(--bg); color: var(--text);
-      padding: 12px 14px; border-radius: 8px;
-      font-size: 12px; line-height: 1.5;
+    .portrait .avatar {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 40%, var(--amber), var(--cyan-dim) 80%);
+      box-shadow: 0 0 24px rgba(244, 162, 59, 0.45);
+      flex-shrink: 0;
+      display: grid; place-items: center;
+      font-size: 22px; font-weight: 700; color: var(--bg-deep);
+    }
+    .portrait .meta { display: flex; flex-direction: column; gap: 2px; }
+    .portrait .name { font-size: 18px; font-weight: 600; }
+    .portrait .voice { font-size: 11px; color: var(--sage); letter-spacing: 0.5px; }
+    .portrait .version { font-size: 10px; color: var(--cyan); letter-spacing: 1.5px; }
+
+    .stats-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    }
+    .stat-card {
+      padding: 10px 12px;
+      background: rgba(13, 18, 25, 0.55);
+      border: 1px solid var(--surfac2);
+      border-radius: 8px;
+    }
+    .stat-card b {
+      display: block; color: var(--gold);
+      font-size: 19px; font-weight: 600;
+      line-height: 1;
+    }
+    .stat-card span {
+      font-size: 10.5px; color: var(--sage);
+      letter-spacing: 0.5px;
+      text-transform: lowercase;
+    }
+
+    .panel-section h3 {
+      font-size: 10.5px; letter-spacing: 2px;
+      color: var(--cyan); font-weight: 600;
+      margin: 0 0 10px; text-transform: uppercase;
+    }
+    .panel-section { padding-top: 6px; }
+    #detail-panel {
+      flex: 1;
+      min-height: 200px;
+    }
+    #detail-panel.empty .placeholder {
+      color: var(--sage); font-size: 12px;
+      font-style: italic; line-height: 1.6;
+    }
+    #detail-panel .title {
+      font-size: 15px; font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    #detail-panel .meta {
+      font-size: 10.5px; color: var(--sage);
+      letter-spacing: 0.4px;
+      margin-bottom: 10px;
+    }
+    #detail-panel .body {
+      font-size: 12.5px; line-height: 1.55;
+      color: var(--text);
+    }
+    #detail-panel pre {
+      background: rgba(7, 9, 13, 0.7);
+      padding: 10px 12px; border-radius: 6px;
+      font-size: 11px; line-height: 1.5;
       white-space: pre-wrap; word-break: break-word;
-      max-height: none;
+      max-height: 320px; overflow-y: auto;
+      border: 1px solid var(--surfac2);
     }
-    aside.panel .body { font-size: 13.5px; line-height: 1.55; }
-    aside.panel .body code {
-      background: var(--surfac2); padding: 1px 5px; border-radius: 3px;
-      font-size: 12.5px;
+    .close-panel {
+      position: absolute; top: 14px; right: 14px;
+      background: none; border: none;
+      color: var(--sage); font-size: 22px;
+      cursor: pointer; line-height: 1;
+      display: none;
     }
-    footer.legend {
-      position: fixed; bottom: 12px; left: 18px;
-      color: var(--sage); font-size: 11px; z-index: 5;
+    @media (max-width: 800px) {
+      .close-panel { display: block; }
     }
-    .legend .swatch {
-      display: inline-block; width: 10px; height: 10px;
-      border-radius: 50%; margin-right: 4px; vertical-align: middle;
+
+    /* ---------- CONTROLS / FOOTER ---------- */
+    .controls {
+      position: fixed; bottom: 18px; left: 18px;
+      display: flex; gap: 8px;
+      z-index: 10;
     }
-    .empty {
+    .ctrl-btn {
+      background: rgba(13, 18, 25, 0.85);
+      border: 1px solid var(--surfac2);
+      color: var(--sage);
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      cursor: pointer; font-size: 16px;
+      display: grid; place-items: center;
+      transition: color 160ms, border-color 160ms;
+      backdrop-filter: blur(6px);
+    }
+    .ctrl-btn:hover { color: var(--gold); border-color: var(--gold); }
+
+    .empty-state {
       position: absolute; inset: 0; display: grid; place-items: center;
       color: var(--sage); text-align: center; padding: 32px;
     }
-    .empty code { background: var(--surfac2); padding: 2px 6px; border-radius: 4px; }
+    .empty-state code {
+      background: rgba(13, 18, 25, 0.7); padding: 3px 7px; border-radius: 4px;
+      color: var(--cyan);
+    }
+
+    .breadcrumb {
+      position: fixed; bottom: 20px; left: 50%;
+      transform: translateX(-50%);
+      color: var(--sage); font-size: 11px;
+      letter-spacing: 1.5px;
+      background: rgba(13, 18, 25, 0.7);
+      padding: 6px 14px; border-radius: 14px;
+      border: 1px solid var(--surfac2);
+      backdrop-filter: blur(6px);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 200ms;
+      z-index: 9;
+    }
+    .breadcrumb.show { opacity: 1; }
   </style>
 </head>
 <body>
-  <header>
+
+  <header class="top">
     <h1>THEO <span class="sub" id="version"></span></h1>
-    <div class="stats" id="stats"></div>
+    <div class="search-wrap">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><path d="M11 11l4 4"/></svg>
+      <input id="search" type="text" placeholder="Search tools, skills, idioms…" autocomplete="off" />
+    </div>
   </header>
 
   <main>
-    <svg id="graph"></svg>
-    <div class="empty" id="empty" style="display:none">
-      No <code>brain.json</code> found. From the repo:
-      <br/><br/>
-      <code>python -m scripts.dump_brain</code>
-      <br/><br/>
-      Then <code>flutter build web &amp;&amp; firebase deploy</code>.
+    <div class="brain-viewport">
+      <svg id="brain" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <!-- holographic glow filter for the brain wireframe -->
+          <filter id="brainGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <!-- subtler glow for pathway lines -->
+          <filter id="pathwayGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="1.2"/>
+          </filter>
+          <!-- node glow -->
+          <filter id="nodeGlow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="2.4" result="b"/>
+            <feMerge>
+              <feMergeNode in="b"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <!-- limbic / core radial gradient -->
+          <radialGradient id="limbicGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#F4A23B" stop-opacity="0.4"/>
+            <stop offset="60%" stop-color="#F4A23B" stop-opacity="0.12"/>
+            <stop offset="100%" stop-color="#F4A23B" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+
+        <!-- Camera group (everything zoomed/panned) -->
+        <g id="camera">
+
+          <!-- ============================================================
+               BRAIN SILHOUETTE
+               Stylized side view, facing right. Coords roughly:
+                 x 100..900 horizontal span
+                 y 100..700 vertical span
+               Each lobe is its own clickable region.
+          ============================================================ -->
+
+          <!-- Frontal lobe — top-front, executive function -->
+          <path class="anatomy region" data-region="frontal" d="
+            M 200,210
+            C 130,210 90,300 110,380
+            C 130,420 200,440 290,430
+            C 360,420 400,360 400,300
+            C 400,240 340,210 270,205
+            Z"/>
+          <text class="region-label" x="220" y="320" text-anchor="middle">Frontal — Voice / Identity</text>
+
+          <!-- Broca's area — speech production / structured skills -->
+          <path class="anatomy region" data-region="broca" d="
+            M 175,400
+            C 145,415 130,445 145,475
+            C 165,500 215,505 245,488
+            C 270,470 270,440 250,420
+            C 230,400 200,395 175,400
+            Z"/>
+          <text class="region-label" x="195" y="455" text-anchor="middle">Broca — Skills</text>
+
+          <!-- Parietal lobe — top-middle, memory + integration -->
+          <path class="anatomy region" data-region="parietal" d="
+            M 400,180
+            C 420,160 500,150 600,160
+            C 680,170 720,200 720,260
+            C 720,320 680,360 600,365
+            C 520,370 440,360 400,320
+            C 380,290 380,230 400,180
+            Z"/>
+          <text class="region-label" x="565" y="270" text-anchor="middle">Parietal — Memory</text>
+
+          <!-- Temporal lobe — side-bottom, language comprehension + episodic -->
+          <path class="anatomy region" data-region="temporal" d="
+            M 290,440
+            C 300,510 380,560 470,560
+            C 560,560 640,540 670,500
+            C 690,470 690,440 660,420
+            C 600,410 500,420 420,425
+            C 360,430 310,430 290,440
+            Z"/>
+          <text class="region-label" x="490" y="510" text-anchor="middle">Temporal — Episodic memory</text>
+
+          <!-- Wernicke's area — comprehension, inside temporal -->
+          <path class="anatomy region" data-region="wernicke" d="
+            M 540,430
+            C 525,440 520,460 530,475
+            C 550,490 590,490 605,475
+            C 620,460 615,440 595,430
+            C 575,425 555,425 540,430
+            Z"/>
+          <text class="region-label" x="572" y="465" text-anchor="middle">Wernicke — Research</text>
+
+          <!-- Occipital lobe — vision, back -->
+          <path class="anatomy region" data-region="occipital" d="
+            M 720,200
+            C 790,205 840,250 845,310
+            C 845,360 810,395 745,395
+            C 705,395 685,380 695,330
+            C 700,290 710,240 720,200
+            Z"/>
+          <text class="region-label" x="775" y="305" text-anchor="middle">Occipital — Vision</text>
+
+          <!-- Motor cortex — top center, action surfaces -->
+          <path class="anatomy region" data-region="motor" d="
+            M 370,140
+            C 400,110 470,100 540,105
+            C 600,110 640,130 645,170
+            C 645,200 600,205 540,200
+            C 470,195 400,190 375,180
+            C 365,165 365,150 370,140
+            Z"/>
+          <text class="region-label" x="510" y="160" text-anchor="middle">Motor — Tools</text>
+
+          <!-- Cerebellum — back-bottom, drift / procedural caution -->
+          <path class="anatomy region" data-region="cerebellum" d="
+            M 700,510
+            C 730,505 800,510 830,540
+            C 850,570 845,610 805,625
+            C 760,635 700,625 685,595
+            C 675,565 685,525 700,510
+            Z"/>
+          <text class="region-label" x="765" y="580" text-anchor="middle">Cerebellum — Drift</text>
+
+          <!-- Brain stem — bottom, Layer 1 core -->
+          <path class="anatomy stem region" data-region="brainstem" d="
+            M 470,560
+            C 475,590 480,640 490,690
+            C 500,720 550,720 560,690
+            C 570,640 575,590 580,560
+            C 560,555 490,555 470,560
+            Z"/>
+          <text class="region-label" x="525" y="660" text-anchor="middle">Brain stem — Core</text>
+
+          <!-- Limbic system — deep center, personality / self / human / narrative -->
+          <ellipse cx="500" cy="380" rx="120" ry="65" fill="url(#limbicGlow)" filter="url(#brainGlow)"/>
+          <ellipse class="anatomy limbic region" data-region="limbic" cx="500" cy="380" rx="115" ry="62"/>
+          <text class="region-label" x="500" y="385" text-anchor="middle">Limbic — Self / Human / Narrative</text>
+
+          <!-- Pathway and node groups (populated by JS) -->
+          <g id="pathways"></g>
+          <g id="nodes"></g>
+
+        </g>
+      </svg>
+
+      <div class="empty-state" id="empty" style="display:none">
+        No <code>brain.json</code> found.<br/><br/>
+        From the repo: <code>python -m scripts.dump_brain</code><br/>
+        then <code>flutter build web &amp;&amp; firebase deploy</code>.
+      </div>
+
+      <div class="controls">
+        <button class="ctrl-btn" id="zoom-fit" title="Fit brain to view">⊡</button>
+        <button class="ctrl-btn" id="zoom-in" title="Zoom in">+</button>
+        <button class="ctrl-btn" id="zoom-out" title="Zoom out">−</button>
+      </div>
+      <div class="breadcrumb" id="breadcrumb"></div>
     </div>
+
+    <aside class="panel" id="panel">
+      <button class="close-panel" id="close-panel" aria-label="Close">×</button>
+
+      <div class="portrait" id="portrait">
+        <div class="avatar" id="avatar">T</div>
+        <div class="meta">
+          <div class="name" id="theo-name">Theo</div>
+          <div class="voice" id="theo-voice">voice: —</div>
+          <div class="version" id="theo-version">v?</div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h3>Vitals</h3>
+        <div class="stats-grid" id="stats"></div>
+      </div>
+
+      <div class="panel-section" id="detail-panel">
+        <h3>Selection</h3>
+        <div class="placeholder">
+          Click a region or a node in the brain. Each region maps to a
+          functional zone — Frontal carries voice and identity, Limbic
+          holds the self-model and the relationship, Motor cortex is
+          where the tools live, Cerebellum is drift detection. Search
+          finds anything by name; pinned nodes pulse.
+        </div>
+      </div>
+    </aside>
   </main>
-
-  <aside class="panel" id="panel" aria-hidden="true">
-    <button class="close" id="close" aria-label="Close">×</button>
-    <h2 id="panel-title"></h2>
-    <div class="meta" id="panel-meta"></div>
-    <div class="body" id="panel-body"></div>
-  </aside>
-
-  <footer class="legend" id="legend"></footer>
 
   <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
   <script>
-    // --- color per category --------------------------------------------
-    const CATEGORY_COLORS = {
-      "core":         "#E6B85C",   // gold — load-bearing
-      "voice":        "#B2A4FF",   // lavender — the voice
-      "principles":   "#8276D6",
-      "skills":       "#7BC47F",
-      "research":     "#7BC47F",
-      "memory":       "#A0B0A6",
-      "threads":      "#E57373",
-      "toolgroup:trading":       "#E6B85C",
-      "toolgroup:memory":        "#A0B0A6",
-      "toolgroup:system":        "#A0B0A6",
-      "toolgroup:safety":        "#E57373",
-      "toolgroup:identity":      "#B2A4FF",
-      "toolgroup:web":           "#7BC47F",
-      "toolgroup:introspection": "#B2A4FF",
-      "toolgroup:osint":         "#7BC47F",
-      "toolgroup:finance":       "#E6B85C",
-      "toolgroup:server_metrics":"#A0B0A6",
-      "toolgroup:security":      "#E57373",
-      "toolgroup:browser":       "#7BC47F",
-      "toolgroup:skills":        "#E6B85C",
-      "toolgroup:diagrams":      "#B2A4FF",
-      "toolgroup:file_sync":     "#7BC47F",
-      "toolgroup:chess":         "#E6B85C",
-      "toolgroup:file_transfer": "#7BC47F",
-      "toolgroup:image_gen":     "#B2A4FF",
-      "toolgroup:qr":            "#7BC47F",
-      "toolgroup:ascii":         "#A0B0A6",
-    };
-    const DEFAULT_COLOR = "#B2A4FF";
-    const colorOf = (id) => CATEGORY_COLORS[id] || DEFAULT_COLOR;
+  // -------------------------------------------------------------------
+  // ANATOMY → CATEGORY MAPPING
+  // Each Theo category lands in one anatomical region. Coordinates
+  // are the rough center of that region in the SVG viewBox (1000x800).
+  // -------------------------------------------------------------------
+  const REGIONS = {
+    frontal:    { cx: 245, cy: 320, rx: 130, ry: 105, label: "Frontal" },
+    motor:      { cx: 510, cy: 155, rx: 130, ry:  40, label: "Motor"   },
+    parietal:   { cx: 560, cy: 265, rx: 140, ry:  80, label: "Parietal"},
+    temporal:   { cx: 490, cy: 495, rx: 175, ry:  65, label: "Temporal"},
+    wernicke:   { cx: 572, cy: 455, rx:  45, ry:  25, label: "Wernicke"},
+    occipital:  { cx: 775, cy: 300, rx:  65, ry:  90, label: "Occipital"},
+    broca:      { cx: 200, cy: 450, rx:  55, ry:  35, label: "Broca"   },
+    cerebellum: { cx: 760, cy: 575, rx:  75, ry:  55, label: "Cerebellum"},
+    brainstem:  { cx: 525, cy: 645, rx:  55, ry:  75, label: "Brain stem"},
+    limbic:     { cx: 500, cy: 380, rx: 110, ry:  58, label: "Limbic"  },
+  };
 
-    // --- load and render -----------------------------------------------
-    fetch("brain.json", {cache: "no-cache"})
-      .then(r => { if (!r.ok) throw new Error("brain.json missing"); return r.json(); })
-      .then(render)
-      .catch(() => { document.getElementById("empty").style.display = "grid"; });
+  const CATEGORY_TO_REGION = {
+    // Layer 1 + core identity
+    "core":                        "brainstem",
+    "voice":                       "frontal",
+    "principles":                  "frontal",
+    // Tools — Motor cortex (action surfaces)
+    "toolgroup:trading":           "motor",
+    "toolgroup:safety":            "cerebellum",
+    "toolgroup:system":            "motor",
+    "toolgroup:identity":          "frontal",
+    "toolgroup:web":               "motor",
+    "toolgroup:introspection":     "limbic",
+    "toolgroup:osint":             "motor",
+    "toolgroup:finance":           "motor",
+    "toolgroup:server_metrics":    "motor",
+    "toolgroup:security":          "cerebellum",
+    "toolgroup:browser":           "motor",
+    "toolgroup:skills":            "broca",
+    "toolgroup:diagrams":          "motor",
+    "toolgroup:file_sync":         "motor",
+    "toolgroup:chess":             "frontal",
+    "toolgroup:file_transfer":     "motor",
+    "toolgroup:image_gen":         "occipital",
+    "toolgroup:qr":                "motor",
+    "toolgroup:ascii":             "occipital",
+    "toolgroup:vision":            "occipital",
+    "toolgroup:register_check":    "limbic",
+    // Skills / Research
+    "skills":                      "broca",
+    "research":                    "wernicke",
+    // Memory + introspective surfaces (limbic core)
+    "memory":                      "limbic",
+    "threads":                     "frontal",
+  };
 
-    function render(data) {
-      // header stats
-      document.getElementById("version").textContent =
-        `v${data.identity_version} · ${data.generated_at.replace("T"," ").slice(0,16)} UTC`;
-      const stats = data.stats || {};
-      const statHtml = Object.entries(stats)
-        .map(([k,v]) => `<div class="stat"><b>${v}</b>${k.replace(/_/g," ")}</div>`)
-        .join("");
-      document.getElementById("stats").innerHTML = statHtml;
+  // Region-specific colors. Holographic palette built around amber/cyan.
+  const REGION_COLOR = {
+    frontal:    "#B2A4FF",  // lavender — voice + identity
+    motor:      "#7BDFA0",  // green-cyan — tools / action
+    parietal:   "#A0B0A6",  // sage — memory
+    temporal:   "#9DC1B7",  // muted teal — episodic
+    wernicke:   "#A0B0A6",  // sage — research
+    occipital:  "#9D7BCF",  // violet — vision
+    broca:      "#E6B85C",  // gold — skills
+    cerebellum: "#E57373",  // red — drift / caution
+    brainstem:  "#F4E4B5",  // pale gold — Layer 1 core
+    limbic:     "#F4A23B",  // amber — personality core
+  };
 
-      // build graph nodes + links
-      const nodes = [{id: "theo", group: "center", label: "THEO", kind: "center"}];
-      const links = [];
-      for (const cat of data.categories) {
+  // -------------------------------------------------------------------
+  // LOAD + RENDER
+  // -------------------------------------------------------------------
+  let _allNodes = [];
+  let _allLinks = [];
+  let _sim = null;
+  let _zoom = null;
+  let _selected = null;
+
+  fetch("brain.json", { cache: "no-cache" })
+    .then(r => { if (!r.ok) throw new Error("brain.json missing"); return r.json(); })
+    .then(render)
+    .catch(() => { document.getElementById("empty").style.display = "grid"; });
+
+  function render(data) {
+    populatePortrait(data);
+    populateStats(data);
+    buildGraph(data);
+    setupZoom();
+    setupSearch();
+    setupRegionClicks();
+    setupCloseButton();
+  }
+
+  function populatePortrait(data) {
+    const v = data.identity_version || "?";
+    document.getElementById("version").textContent =
+      `v${v} · ${(data.generated_at || "").replace("T"," ").slice(0,16)}`;
+    document.getElementById("theo-version").textContent = `v${v}`;
+
+    // Name from stats if it's surfaced; otherwise fall back to "Theo"
+    // The dump_brain script doesn't include name + voice yet — placeholder.
+    const name = (data.name) || "Theo";
+    const voice = (data.voice) || "voice: not picked yet";
+    document.getElementById("theo-name").textContent = name;
+    document.getElementById("theo-voice").textContent = voice;
+    document.getElementById("avatar").textContent = name.charAt(0).toUpperCase();
+  }
+
+  function populateStats(data) {
+    const s = data.stats || {};
+    const order = [
+      ["tools",         "tools"],
+      ["transcripts",   "sessions"],
+      ["memory_chunks", "chunks"],
+      ["idioms",        "idioms"],
+      ["open_threads",  "open threads"],
+      ["pinned",        "pinned"],
+    ];
+    const html = order
+      .filter(([k]) => s[k] !== undefined)
+      .map(([k, label]) => `
+        <div class="stat-card">
+          <b>${typeof s[k] === "number" ? s[k].toLocaleString() : s[k]}</b>
+          <span>${label}</span>
+        </div>`)
+      .join("");
+    document.getElementById("stats").innerHTML = html;
+  }
+
+  function buildGraph(data) {
+    const nodes = [];
+    const links = [];
+
+    for (const cat of data.categories || []) {
+      const region = CATEGORY_TO_REGION[cat.id] || "limbic";
+      for (const n of cat.nodes || []) {
         nodes.push({
-          id: cat.id, group: cat.id, label: cat.label,
-          kind: "category",
+          ...n,
+          group: cat.id,
+          region,
+          categoryLabel: cat.label,
         });
-        links.push({source: "theo", target: cat.id});
-        for (const n of (cat.nodes || [])) {
-          nodes.push({
-            ...n, group: cat.id, kind: "leaf",
-            categoryLabel: cat.label,
-          });
-          links.push({source: cat.id, target: n.id});
-        }
       }
-
-      // legend
-      const cats = data.categories;
-      document.getElementById("legend").innerHTML = cats.map(c =>
-        `<span style="margin-right:14px"><span class="swatch" style="background:${colorOf(c.id)}"></span>${c.label}</span>`
-      ).join("");
-
-      // d3 force layout
-      const svg = d3.select("#graph");
-      const W = window.innerWidth, H = window.innerHeight;
-
-      const g = svg.append("g");
-      svg.call(d3.zoom().scaleExtent([0.3, 3]).on("zoom",
-        (e) => g.attr("transform", e.transform)));
-
-      const sim = d3.forceSimulation(nodes)
-        .force("link", d3.forceLink(links).id(d=>d.id)
-          .distance(d => d.source.kind === "center" ? 180 : 60).strength(0.6))
-        .force("charge", d3.forceManyBody().strength(-160))
-        .force("center", d3.forceCenter(W/2, H/2))
-        .force("collide", d3.forceCollide().radius(d =>
-          d.kind === "center" ? 40 : d.kind === "category" ? 22 : 12));
-
-      const link = g.append("g").attr("class","links").selectAll("line")
-        .data(links).join("line").attr("class","link");
-
-      const node = g.append("g").attr("class","nodes").selectAll("g.node")
-        .data(nodes).join("g").attr("class", d => `node ${d.kind}`)
-        .call(d3.drag()
-          .on("start",(e,d)=>{ if(!e.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
-          .on("drag",(e,d)=>{ d.fx=e.x; d.fy=e.y; })
-          .on("end",(e,d)=>{ if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
-
-      node.append("circle")
-        .attr("r", d => d.kind === "center" ? 22 : d.kind === "category" ? 11 : 6)
-        .attr("fill", d => d.kind === "center" ? "#E8ECF0" : colorOf(d.group));
-
-      node.append("text")
-        .attr("x", d => d.kind === "center" ? 0 : (d.kind === "category" ? 14 : 9))
-        .attr("y", d => d.kind === "center" ? -28 : 4)
-        .attr("text-anchor", d => d.kind === "center" ? "middle" : "start")
-        .text(d => d.label);
-
-      node.on("click", (_e, d) => openPanel(d));
-
-      sim.on("tick", () => {
-        link
-          .attr("x1", d=>d.source.x).attr("y1", d=>d.source.y)
-          .attr("x2", d=>d.target.x).attr("y2", d=>d.target.y);
-        node.attr("transform", d => `translate(${d.x},${d.y})`);
-      });
-
-      // --- panel ------------------------------------------------------
-      const panel = document.getElementById("panel");
-      const title = document.getElementById("panel-title");
-      const meta  = document.getElementById("panel-meta");
-      const body  = document.getElementById("panel-body");
-      document.getElementById("close").addEventListener("click", closePanel);
-
-      function closePanel() {
-        panel.classList.remove("open");
-        d3.selectAll("g.node").classed("selected", false);
-      }
-      function openPanel(d) {
-        d3.selectAll("g.node").classed("selected", n => n.id === d.id);
-        title.textContent = d.label;
-        const bits = [];
-        if (d.kind === "center") bits.push("The whole system");
-        else if (d.kind === "category") bits.push("Category");
-        else if (d.categoryLabel) bits.push(d.categoryLabel);
-        if (d.path) bits.push(d.path);
-        if (d.open !== undefined) bits.push(d.open ? "OPEN" : "closed");
-        meta.textContent = bits.join(" · ");
-
-        let html = "";
-        if (d.kind === "center") {
-          html = `<p>Theo. Identity, voice, memory, tools — click any node to see what's inside.</p>`;
-        } else if (d.kind === "category") {
-          // show child names
-          const children = nodes.filter(n => n.group === d.id && n.kind === "leaf");
-          html = `<p>${children.length} item${children.length===1?"":"s"} in this category.</p>`;
-          html += "<ul>" + children.map(c=>`<li>${escapeHtml(c.label)}</li>`).join("") + "</ul>";
-        } else {
-          if (d.body) html += `<pre>${escapeHtml(d.body)}</pre>`;
-          if (d.schema) html += `<div class="meta" style="margin-top:14px">Schema:</div>
-                                 <pre>${escapeHtml(JSON.stringify(d.schema, null, 2))}</pre>`;
-        }
-        body.innerHTML = html;
-        panel.classList.add("open");
-      }
-
-      function escapeHtml(s) {
-        return String(s).replace(/[&<>"']/g, c => ({
-          "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
-        }[c]));
-      }
-
-      window.addEventListener("resize", () => {
-        sim.force("center", d3.forceCenter(window.innerWidth/2, window.innerHeight/2));
-        sim.alpha(0.3).restart();
-      });
     }
+
+    // Build implicit links — each node links to a fictitious region anchor.
+    // d3 force will pull nodes toward their region center using forceX/Y
+    // anchors rather than visible links between every pair.
+    // Visible pathways: ONE pathway from limbic to each region center,
+    // suggesting how the core radiates outward.
+    const drawnRegions = new Set(nodes.map(n => n.region));
+    drawnRegions.delete("limbic");
+    for (const r of drawnRegions) {
+      links.push({ source: "anchor_limbic", target: `anchor_${r}`, fromRegion: "limbic", toRegion: r });
+    }
+
+    _allNodes = nodes;
+    _allLinks = links;
+
+    // d3 force simulation
+    _sim = d3.forceSimulation(nodes)
+      .force("x", d3.forceX(d => REGIONS[d.region].cx).strength(0.18))
+      .force("y", d3.forceY(d => REGIONS[d.region].cy).strength(0.18))
+      .force("collide", d3.forceCollide().radius(7).strength(0.8))
+      .force("charge", d3.forceManyBody().strength(-12))
+      .alpha(0.8)
+      .alphaDecay(0.035);
+
+    const pathwayG = d3.select("#pathways");
+    const nodeG = d3.select("#nodes");
+
+    // Draw region-to-region pathways (using REGION centers, not nodes)
+    pathwayG.selectAll("path.pathway")
+      .data(links).join("path")
+        .attr("class", "pathway")
+        .attr("d", l => pathwayPath(REGIONS["limbic"], REGIONS[l.toRegion]));
+
+    // Draw nodes
+    const node = nodeG.selectAll("g.node")
+      .data(nodes, d => d.id).join("g")
+        .attr("class", "node")
+        .attr("data-id", d => d.id)
+        .on("click", (e, d) => { e.stopPropagation(); selectNode(d); });
+
+    node.append("circle")
+      .attr("r", 3.5)
+      .attr("fill", d => REGION_COLOR[d.region] || "#B2A4FF");
+
+    node.append("text")
+      .attr("x", 6)
+      .attr("y", 3)
+      .text(d => truncate(d.label, 28));
+
+    _sim.on("tick", () => {
+      node.attr("transform", d => `translate(${d.x},${d.y})`);
+    });
+  }
+
+  function pathwayPath(a, b) {
+    // Subtle curved pathway between two region centers
+    const mx = (a.cx + b.cx) / 2;
+    const my = (a.cy + b.cy) / 2;
+    const dx = b.cx - a.cx, dy = b.cy - a.cy;
+    // Perpendicular offset for curve
+    const off = 30;
+    const norm = Math.hypot(dx, dy) || 1;
+    const ox = -dy / norm * off, oy = dx / norm * off;
+    return `M ${a.cx},${a.cy} Q ${mx + ox},${my + oy} ${b.cx},${b.cy}`;
+  }
+
+  function truncate(s, n) {
+    s = String(s || "");
+    return s.length > n ? s.slice(0, n - 1) + "…" : s;
+  }
+
+  // -------------------------------------------------------------------
+  // ZOOM
+  // -------------------------------------------------------------------
+  function setupZoom() {
+    const svg = d3.select("#brain");
+    const camera = d3.select("#camera");
+    _zoom = d3.zoom()
+      .scaleExtent([0.6, 6])
+      .on("zoom", (e) => camera.attr("transform", e.transform));
+    svg.call(_zoom);
+    // Fit initially
+    svg.call(_zoom.transform, d3.zoomIdentity);
+
+    d3.select("#zoom-in").on("click", () => svg.transition().call(_zoom.scaleBy, 1.4));
+    d3.select("#zoom-out").on("click", () => svg.transition().call(_zoom.scaleBy, 0.7));
+    d3.select("#zoom-fit").on("click", () => {
+      svg.transition().call(_zoom.transform, d3.zoomIdentity);
+      clearBreadcrumb();
+    });
+  }
+
+  function zoomToRegion(regionId) {
+    const r = REGIONS[regionId];
+    if (!r) return;
+    const svg = d3.select("#brain");
+    const w = 1000, h = 800;
+    // Aim for ~2.4x zoom on the region
+    const scale = 2.4;
+    const tx = w/2 - r.cx * scale;
+    const ty = h/2 - r.cy * scale;
+    svg.transition().duration(700)
+       .call(_zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+    setBreadcrumb(r.label.toUpperCase());
+    d3.selectAll(".anatomy.region").classed("active", false);
+    d3.select(`[data-region="${regionId}"]`).classed("active", true);
+  }
+
+  function setBreadcrumb(text) {
+    const el = document.getElementById("breadcrumb");
+    el.textContent = text;
+    el.classList.add("show");
+  }
+  function clearBreadcrumb() {
+    document.getElementById("breadcrumb").classList.remove("show");
+    d3.selectAll(".anatomy.region").classed("active", false);
+  }
+
+  // -------------------------------------------------------------------
+  // REGION CLICKS
+  // -------------------------------------------------------------------
+  function setupRegionClicks() {
+    d3.selectAll(".anatomy.region").on("click", function(e) {
+      const id = this.getAttribute("data-region");
+      zoomToRegion(id);
+      showRegionDetail(id);
+    });
+    // Click background to clear
+    d3.select("#brain").on("click", function(e) {
+      if (e.target.tagName === "svg") {
+        clearBreadcrumb();
+        clearDetail();
+      }
+    });
+  }
+
+  function showRegionDetail(regionId) {
+    const r = REGIONS[regionId];
+    const matchingNodes = _allNodes.filter(n => n.region === regionId);
+    const grouped = {};
+    for (const n of matchingNodes) {
+      grouped[n.categoryLabel || n.group] = grouped[n.categoryLabel || n.group] || [];
+      grouped[n.categoryLabel || n.group].push(n);
+    }
+    const groupHtml = Object.entries(grouped).map(([label, items]) => `
+      <div style="margin-bottom: 10px;">
+        <div style="color: var(--cyan); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px;">${escapeHtml(label)}</div>
+        ${items.map(i => `<div style="font-size: 12.5px; padding: 2px 0; cursor: pointer;" onclick="window._selectById('${escapeHtml(i.id)}')">· ${escapeHtml(i.label)}</div>`).join("")}
+      </div>
+    `).join("");
+    const dp = document.getElementById("detail-panel");
+    dp.classList.remove("empty");
+    dp.innerHTML = `
+      <h3>${escapeHtml(r.label)}</h3>
+      <div class="title">${escapeHtml(r.label)} region</div>
+      <div class="meta">${matchingNodes.length} node${matchingNodes.length === 1 ? "" : "s"} in this region</div>
+      <div class="body">${groupHtml || "<i style='color:var(--sage)'>(empty)</i>"}</div>`;
+  }
+
+  // -------------------------------------------------------------------
+  // NODE SELECTION
+  // -------------------------------------------------------------------
+  window._selectById = (id) => {
+    const n = _allNodes.find(x => x.id === id);
+    if (n) selectNode(n);
+  };
+
+  function selectNode(n) {
+    _selected = n;
+    d3.selectAll("g.node").classed("selected", d => d.id === n.id);
+    showNodeDetail(n);
+  }
+
+  function showNodeDetail(n) {
+    const dp = document.getElementById("detail-panel");
+    dp.classList.remove("empty");
+
+    let bodyHtml = "";
+    if (n.body) {
+      bodyHtml += `<pre>${escapeHtml(n.body)}</pre>`;
+    }
+    if (n.schema) {
+      bodyHtml += `<div class="meta" style="margin-top:10px">Schema:</div>
+                   <pre>${escapeHtml(JSON.stringify(n.schema, null, 2))}</pre>`;
+    }
+    if (n.path) {
+      bodyHtml += `<div class="meta" style="margin-top:10px;color:var(--cyan)">${escapeHtml(n.path)}</div>`;
+    }
+
+    dp.innerHTML = `
+      <h3>${escapeHtml(REGIONS[n.region].label)}</h3>
+      <div class="title">${escapeHtml(n.label)}</div>
+      <div class="meta">${escapeHtml(n.categoryLabel || n.group)}</div>
+      <div class="body">${bodyHtml || "<i style='color:var(--sage)'>(no body)</i>"}</div>
+    `;
+  }
+
+  function clearDetail() {
+    _selected = null;
+    d3.selectAll("g.node").classed("selected", false);
+    const dp = document.getElementById("detail-panel");
+    dp.classList.add("empty");
+    dp.innerHTML = `<h3>Selection</h3>
+      <div class="placeholder">
+        Click a region or a node in the brain. Each region maps to a
+        functional zone — Frontal carries voice and identity, Limbic
+        holds the self-model and the relationship, Motor cortex is
+        where the tools live, Cerebellum is drift detection. Search
+        finds anything by name; pinned nodes pulse.
+      </div>`;
+  }
+
+  // -------------------------------------------------------------------
+  // SEARCH
+  // -------------------------------------------------------------------
+  function setupSearch() {
+    const input = document.getElementById("search");
+    input.addEventListener("input", (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      if (!q) {
+        d3.selectAll("g.node").classed("matched", false).classed("dimmed", false);
+        return;
+      }
+      d3.selectAll("g.node")
+        .classed("matched", d => (d.label || "").toLowerCase().includes(q))
+        .classed("dimmed",  d => !(d.label || "").toLowerCase().includes(q));
+    });
+  }
+
+  // -------------------------------------------------------------------
+  // CLOSE PANEL (mobile)
+  // -------------------------------------------------------------------
+  function setupCloseButton() {
+    document.getElementById("close-panel").addEventListener("click", () => {
+      document.getElementById("panel").classList.remove("open");
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+    }[c]));
+  }
   </script>
 </body>
 </html>

@@ -139,6 +139,17 @@
 
 ## Already integrated (live tool wired)
 
+- **[rpg-ai-framework](./rpg-ai-framework/ORIGIN.md)** — **Theo's own
+  ancestor.** Ian's original project: a FastAPI backend for an
+  AI-powered RPG where a silent profiler read player messages,
+  crystallized them into a poetic archetype, and seeded a generated
+  world. The lineage doc shows how each piece evolved into Theo's
+  current matrix: WONDER_DIRECTIVE → IDENTITY.md Voice/Idioms;
+  PlayerProfile → human_model.md; mirror_generator → narrative.md
+  chapters; archetype crystallization → self_model.md. Files:
+  ORIGIN.md (lineage map), wonder-directive.md, npc-voice-directive.md,
+  profile-axes.md, mirror-pattern.md, archetype-pattern.md.
+
 - **[osiris](./osiris/_INDEX.md)** — OSINT dashboard. Live via the
   `osint_query` tool — 23 endpoints for earthquakes, fires, flights,
   news, conflict zones, etc.
