@@ -939,16 +939,64 @@ function setupRegionRail() {
   rail.appendChild(clear);
 }
 
+// Glowing region indicator — single sphere we move around to mark the
+// currently focused region on the brain. Initialized lazily.
+let _focusIndicator = null;
+function _ensureFocusIndicator() {
+  if (_focusIndicator) return _focusIndicator;
+  _focusIndicator = new THREE.Mesh(
+    new THREE.SphereGeometry(0.55, 32, 32),
+    new THREE.MeshBasicMaterial({
+      color: 0xE6B85C,
+      transparent: true,
+      opacity: 0.0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  scene.add(_focusIndicator);
+  return _focusIndicator;
+}
+
 function focusRegion(id) {
   _activeRegion = id;
-  const r = REGIONS[id];
-  let cx = r.cx, cy = r.cy, cz = r.cz;
-  if (_envelopeScale) {
-    cx *= _envelopeScale.sx;
-    cy *= _envelopeScale.sy;
-    cz *= _envelopeScale.sz;
+
+  // Camera target: the centroid of where this region's nodes will be
+  // AT FULL EXPANSION. We're zooming in deep, so the nodes will be at
+  // their expandPos (not their clusterPos / not the region anchor).
+  // Aim at the actual node cloud, not the empty space it used to occupy.
+  let cx = 0, cy = 0, cz = 0, count = 0;
+  for (const m of _allNodeMeshes) {
+    if (m.userData.region === id) {
+      cx += m.userData.expandPos.x;
+      cy += m.userData.expandPos.y;
+      cz += m.userData.expandPos.z;
+      count++;
+    }
   }
-  animateCamera(new THREE.Vector3(cx, cy, cz), 1.6);
+  let target;
+  if (count > 0) {
+    target = new THREE.Vector3(cx / count, cy / count, cz / count);
+  } else {
+    // Fallback to the region anchor (envelope-scaled)
+    const r = REGIONS[id];
+    target = new THREE.Vector3(r.cx, r.cy, r.cz);
+    if (_envelopeScale) {
+      target.x *= _envelopeScale.sx;
+      target.y *= _envelopeScale.sy;
+      target.z *= _envelopeScale.sz;
+    }
+  }
+  // Snap the zoom ladder to a deep step so subsequent scrolls behave.
+  // ZOOM_STEPS = [22, 14, 9, 5.5, 3.5, 2, 1]; index 5 = distance 2.0.
+  _zoomIndex = Math.max(0, ZOOM_STEPS.length - 2);
+  animateCamera(target, ZOOM_STEPS[_zoomIndex]);
+
+  // Highlight the region on the brain — glow sphere at the centroid.
+  const indicator = _ensureFocusIndicator();
+  indicator.position.copy(target);
+  indicator.material.color.setHex(REGION_COLOR[id] || 0xE6B85C);
+  indicator.material.opacity = 0.45;
 
   // Mark active button + show clear
   document.querySelectorAll(".region-pick").forEach(b => {
@@ -962,6 +1010,12 @@ function focusRegion(id) {
     m.material.opacity = matched ? 1.0 : 0.10;
   }
 
+  // Populate the side panel with the list of nodes in this region.
+  renderRegionList(id);
+  // Make sure the panel is visible on narrow viewports (mobile media query
+  // hides it by default — focusing a region should pop it open).
+  document.getElementById("panel").classList.add("open");
+
   // Pause auto-rotate while focused
   controls.autoRotate = false;
 }
@@ -973,7 +1027,63 @@ function clearRegionFocus() {
   document.querySelectorAll(".region-pick.active").forEach(b => b.classList.remove("active"));
   document.getElementById("rail-clear").classList.remove("show");
   for (const m of _allNodeMeshes) m.material.opacity = 0.92;
+  if (_focusIndicator) _focusIndicator.material.opacity = 0.0;
+  // Reset panel back to placeholder
+  const detail = document.getElementById("detail-panel");
+  detail.classList.add("empty");
+  detail.innerHTML = `
+    <h3>Selection</h3>
+    <div class="placeholder">
+      Drag to rotate. Scroll to zoom. Click a node to inspect.
+      Each lobe carries a category — Frontal for voice and identity,
+      Limbic for the self-model and the relationship, Motor cortex
+      for tools, Cerebellum for drift detection.
+    </div>
+  `;
   controls.autoRotate = autoRotateOn;
+}
+
+// Side-panel content when a REGION (not a single node) is focused.
+// Shows the list of nodes in that region; each one is clickable to
+// drill into the individual node's body text.
+function renderRegionList(id) {
+  const r = REGIONS[id];
+  const detail = document.getElementById("detail-panel");
+  detail.classList.remove("empty");
+  const colorHex = "#" + (REGION_COLOR[id] || 0xE6B85C).toString(16).padStart(6, "0");
+
+  const nodesInRegion = _allNodeMeshes.filter(m => m.userData.region === id);
+  if (nodesInRegion.length === 0) {
+    detail.innerHTML = `
+      <h3>Region · Nodes</h3>
+      <div class="title" style="color:${colorHex}">${escapeHtml(r.label)}</div>
+      <div class="body" style="color:var(--sage);font-style:italic">
+        No nodes in this region yet.
+      </div>
+    `;
+    return;
+  }
+
+  const items = nodesInRegion.map((m, idx) => {
+    const d = m.userData.data;
+    const label = d.label || d.id || "node";
+    return `<li class="region-node-item" data-node-idx="${idx}">${escapeHtml(label)}</li>`;
+  }).join("");
+
+  detail.innerHTML = `
+    <h3>Region · Nodes</h3>
+    <div class="title" style="color:${colorHex}">${escapeHtml(r.label)}</div>
+    <div class="meta">${nodesInRegion.length} ${nodesInRegion.length === 1 ? "node" : "nodes"}</div>
+    <ul class="region-node-list">${items}</ul>
+  `;
+
+  detail.querySelectorAll(".region-node-item").forEach(li => {
+    li.addEventListener("click", () => {
+      const i = parseInt(li.dataset.nodeIdx, 10);
+      const mesh = nodesInRegion[i];
+      if (mesh) selectNode(mesh);
+    });
+  });
 }
 
 function animateCamera(targetPos, distance) {

@@ -232,6 +232,30 @@
       max-height: 320px; overflow-y: auto;
       border: 1px solid var(--surfac2);
     }
+    .region-node-list {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0 0;
+      max-height: calc(100vh - 380px);
+      overflow-y: auto;
+    }
+    .region-node-item {
+      padding: 8px 12px;
+      margin-bottom: 4px;
+      font-size: 12px;
+      color: var(--text);
+      background: rgba(13, 18, 25, 0.55);
+      border: 1px solid var(--surfac2);
+      border-left: 2px solid var(--gold);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 160ms, transform 160ms, border-color 160ms;
+    }
+    .region-node-item:hover {
+      background: rgba(230, 184, 92, 0.12);
+      border-left-color: var(--amber);
+      transform: translateX(2px);
+    }
     .close-panel {
       position: absolute; top: 14px; right: 14px;
       background: none; border: none;
