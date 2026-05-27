@@ -984,15 +984,24 @@
     //                   perfect ellipsoids, so 0.5 sits inside the bulk.
     //   SHELL_SURFACE = how far out the EXPANDED position sits. 1.0 puts
     //                   nodes right on the envelope; >1.0 explodes past it.
-    const SHELL_DEEP    = 0.50;
-    const SHELL_SURFACE = 1.05;
+    const SHELL_DEEP    = 0.45;
+    const SHELL_SURFACE = 0.92;
 
     // Per-region angular jitter for cluster vs expand. CLUSTER_JITTER
     // controls separation at the default (zoomed-out) view -- bigger =
-    // less smooshed. EXPAND_JITTER controls the maximum spread at full
-    // zoom-in -- the Iron Man "element discovery" explosion target.
-    const CLUSTER_JITTER = 0.30;
-    const EXPAND_JITTER  = 1.20;
+    // less smooshed. EXPAND_JITTER controls the spread at full zoom-in.
+    // Keep expand jitter modest so nodes from one region don't bleed
+    // into another's zone; the visible drama comes mostly from node
+    // SCALING (NODE_SCALE_MAX) and from the positional shell delta.
+    const CLUSTER_JITTER = 0.32;
+    const EXPAND_JITTER  = 0.85;
+
+    // Node scale interpolation: at full zoom-in nodes scale by this
+    // factor relative to their default size. That's the other half of
+    // the Iron Man "grows quickly and vastly" effect -- they actually
+    // get visibly bigger, not just farther apart.
+    const NODE_SCALE_MIN = 1.0;
+    const NODE_SCALE_MAX = 2.2;
 
     // Math helper: ray from origin in `dir` (unit vector) hits the
     // brain's bounding ellipsoid at distance t. Solve (x/a)^2+(y/b)^2+(z/c)^2=1.
@@ -1128,12 +1137,11 @@
     });
 
     function highlightNode(mesh) {
-      mesh.scale.setScalar(1.8);
+      // Scale is handled by the tick loop (rides on top of zoom scale).
       mesh.material.color.setHex(0xFFD27A);
     }
     function restoreNode(mesh) {
       if (mesh === _selected) return;
-      mesh.scale.setScalar(1.0);
       mesh.material.color.setHex(mesh.userData.baseColor);
     }
 
@@ -1341,31 +1349,40 @@
       limbicCore.scale.setScalar(pulse);
 
       // Zoom-driven cluster <-> expand interpolation. As the camera
-      // approaches the brain, nodes spread out from their clustered
-      // positions to their expanded positions (detail emerges, Iron Man
-      // style). Raw t = 0 when far away, 1 when right up close.
+      // approaches the brain, nodes spread AND scale up -- the Iron Man
+      // "element grows quickly and vastly" effect comes from both at
+      // once. Linear lerp across the whole zoom range so transitions
+      // feel continuous (not the "two modes" Ian reported in v3.11).
       const camDist = camera.position.distanceTo(controls.target);
-      const rawT = THREE.MathUtils.clamp(1 - (camDist - 1.2) / 4.5, 0, 1);
-      // Dramatic easing: pow(t, 0.4) ramps fast at the start so a small
-      // zoom-in triggers a huge expansion — the Iron Man "element grows
-      // quickly and vastly" feel.
-      const expandT = Math.pow(rawT, 0.40);
+      const expandT = THREE.MathUtils.clamp(
+        1 - (camDist - 1.0) / 6.0,
+        0, 1,
+      );
+      const nodeScale = NODE_SCALE_MIN + (NODE_SCALE_MAX - NODE_SCALE_MIN) * expandT;
 
       for (let i = 0; i < _allNodeMeshes.length; i++) {
         const m = _allNodeMeshes[i];
-        if (m === _hovered || m === _selected) continue;
         const c = m.userData.clusterPos;
         const e = m.userData.expandPos;
         if (!c || !e) continue;
-        // Base position = lerp(cluster, expand, t)
-        m.position.lerpVectors(c, e, expandT);
-        m.userData.basePosition.copy(m.position);
-        // Subtle bob on top — skip when focused or dragging
-        if (!_activeRegion && !userInteracting) {
-          const phase = i * 0.17;
-          m.position.x += Math.sin(t * 0.6 + phase) * 0.006;
-          m.position.y += Math.cos(t * 0.5 + phase) * 0.004;
+
+        // Position: hover/select stay put; everything else lerps and bobs
+        if (m !== _hovered && m !== _selected) {
+          m.position.lerpVectors(c, e, expandT);
+          m.userData.basePosition.copy(m.position);
+          if (!_activeRegion && !userInteracting) {
+            const phase = i * 0.17;
+            m.position.x += Math.sin(t * 0.6 + phase) * 0.006;
+            m.position.y += Math.cos(t * 0.5 + phase) * 0.004;
+          }
         }
+
+        // Scale: every node tracks zoom scale, with a multiplier on
+        // top for hover/select so they pop above siblings.
+        let mult = 1.0;
+        if (m === _selected) mult = 2.1;
+        else if (m === _hovered) mult = 1.7;
+        m.scale.setScalar(nodeScale * mult);
       }
 
       controls.update();
