@@ -525,7 +525,7 @@
     scene.fog = new THREE.FogExp2(0x02030a, 0.06);
 
     const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 100);
-    camera.position.set(0.0, 0.3, 5.5);
+    camera.position.set(0.0, 0.2, 4.2);
 
     const renderer = new THREE.WebGLRenderer({
       canvas, antialias: true, alpha: true,
@@ -982,10 +982,17 @@
     //                   ellipsoid radius) the CLUSTERED position sits.
     //                   Lower = deeper inside the brain. Brains aren't
     //                   perfect ellipsoids, so 0.5 sits inside the bulk.
-    //   SHELL_SURFACE = how far out the EXPANDED position sits, ideally
-    //                   near the visible point-cloud surface.
+    //   SHELL_SURFACE = how far out the EXPANDED position sits. 1.0 puts
+    //                   nodes right on the envelope; >1.0 explodes past it.
     const SHELL_DEEP    = 0.50;
-    const SHELL_SURFACE = 0.78;
+    const SHELL_SURFACE = 1.05;
+
+    // Per-region angular jitter for cluster vs expand. CLUSTER_JITTER
+    // controls separation at the default (zoomed-out) view -- bigger =
+    // less smooshed. EXPAND_JITTER controls the maximum spread at full
+    // zoom-in -- the Iron Man "element discovery" explosion target.
+    const CLUSTER_JITTER = 0.30;
+    const EXPAND_JITTER  = 1.20;
 
     // Math helper: ray from origin in `dir` (unit vector) hits the
     // brain's bounding ellipsoid at distance t. Solve (x/a)^2+(y/b)^2+(z/c)^2=1.
@@ -1022,26 +1029,34 @@
     // (near the surface, spread wider across the region). In the animate
     // loop we lerp between them based on camera zoom.
     function computeNodePositions(regionId, region) {
-      // Deep structures: cluster very tight, expand to fill region volume
+      // Deep structures: cluster moderately tight, expand to OVERFILL
+      // the region (matches the dramatic spread we use on cortical
+      // regions so the effect feels consistent).
       if (_INSIDE_REGIONS.has(regionId) || !loadedBrain) {
         const tight = randomPositionInRegion({
           ...region,
-          rx: region.rx * 0.25,
-          ry: region.ry * 0.25,
-          rz: region.rz * 0.25,
+          rx: region.rx * 0.40,
+          ry: region.ry * 0.40,
+          rz: region.rz * 0.40,
         });
-        const full = randomPositionInRegion(region);
+        const full = randomPositionInRegion({
+          ...region,
+          rx: region.rx * 1.8,
+          ry: region.ry * 1.8,
+          rz: region.rz * 1.8,
+        });
         if (_envelopeScale) {
           tight.x *= _envelopeScale.sx; tight.y *= _envelopeScale.sy; tight.z *= _envelopeScale.sz;
           full.x  *= _envelopeScale.sx; full.y  *= _envelopeScale.sy; full.z  *= _envelopeScale.sz;
         }
         return { cluster: tight, expand: full };
       }
-      // Cortical regions: cluster deep, expand to surface, wider jitter
-      // on expand for the "detail emerges as you zoom" effect.
+      // Cortical regions: cluster deep, expand to surface (and slightly
+      // past), with much wider jitter on expand for the dramatic
+      // "Iron Man element discovery" explosion.
       return {
-        cluster: surfacePosition(region, SHELL_DEEP,    0.20),
-        expand:  surfacePosition(region, SHELL_SURFACE, 0.75),
+        cluster: surfacePosition(region, SHELL_DEEP,    CLUSTER_JITTER),
+        expand:  surfacePosition(region, SHELL_SURFACE, EXPAND_JITTER),
       };
     }
 
@@ -1206,9 +1221,10 @@
     // =================================================================
     function setupControls() {
       document.getElementById("zoom-fit").addEventListener("click", () => {
-        camera.position.set(0.0, 0.3, 5.5);
+        camera.position.set(0.0, 0.2, 4.2);
         controls.target.set(0, 0, 0);
         controls.update();
+        clearRegionFocus();
       });
       document.getElementById("zoom-in").addEventListener("click", () => {
         camera.position.multiplyScalar(0.85);
@@ -1288,7 +1304,7 @@
 
     function clearRegionFocus() {
       _activeRegion = null;
-      animateCamera(new THREE.Vector3(0, 0, 0), 5.5);
+      animateCamera(new THREE.Vector3(0, 0, 0), 4.2);
       document.querySelectorAll(".region-pick.active").forEach(b => b.classList.remove("active"));
       document.getElementById("rail-clear").classList.remove("show");
       for (const m of _allNodeMeshes) m.material.opacity = 0.92;
@@ -1327,9 +1343,13 @@
       // Zoom-driven cluster <-> expand interpolation. As the camera
       // approaches the brain, nodes spread out from their clustered
       // positions to their expanded positions (detail emerges, Iron Man
-      // style). Lerp t = 0 when far away, 1 when right up close.
+      // style). Raw t = 0 when far away, 1 when right up close.
       const camDist = camera.position.distanceTo(controls.target);
-      const expandT = THREE.MathUtils.clamp(1 - (camDist - 1.5) / 3.5, 0, 1);
+      const rawT = THREE.MathUtils.clamp(1 - (camDist - 1.2) / 4.5, 0, 1);
+      // Dramatic easing: pow(t, 0.4) ramps fast at the start so a small
+      // zoom-in triggers a huge expansion — the Iron Man "element grows
+      // quickly and vastly" feel.
+      const expandT = Math.pow(rawT, 0.40);
 
       for (let i = 0; i < _allNodeMeshes.length; i++) {
         const m = _allNodeMeshes[i];
