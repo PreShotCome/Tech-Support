@@ -667,39 +667,27 @@
     // ---- Real anatomical mesh (brain.glb by Oxterium, Sketchfab Standard) ----
     // Swap in once it loads. Keep limbicCore as the inner glowing core.
     let loadedBrain = null;
+    // Captured by GLB success callback; consumed by buildNodes if it runs
+    // AFTER the GLB has loaded. Handles either ordering of the two async loads.
+    let _envelopeScale = null;
     const loader = new GLTFLoader();
     loader.load(
       "assets/brain.glb",
       (gltf) => {
         const realBrain = gltf.scene;
 
-        // Collect meshes first — mutating obj.children during traverse
-        // causes infinite recursion (the new child gets enumerated and
-        // we add ANOTHER child to it, ad infinitum).
-        const meshes = [];
-        realBrain.traverse((obj) => { if (obj.isMesh) meshes.push(obj); });
+        // Keep the original Sketchfab materials — the model was designed
+        // with its own holographic look, and our amber override was killing
+        // that. We do NOT traverse + replace materials anymore.
 
-        // Re-skin every Mesh in the model with our holographic wireframe.
-        for (const obj of meshes) {
-          obj.material = new THREE.MeshBasicMaterial({
-            color: 0xF4A23B,
-            wireframe: true,
-            transparent: true,
-            opacity: 0.55,
-          });
-        }
-
-        // Normalize scale + center the model so it occupies the same
-        // envelope as our procedural cortex (~3.3 wide). The Sketchfab
-        // model likely comes in arbitrary units / off-center.
+        // Normalize scale + center: the Sketchfab model comes in arbitrary
+        // units / off-center. Scale so longest axis = 3.3, then recenter.
         const box = new THREE.Box3().setFromObject(realBrain);
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
-        // Use the longest dimension as the reference and scale to 3.3
         const longest = Math.max(size.x, size.y, size.z);
         const scale = 3.3 / longest;
         realBrain.scale.setScalar(scale);
-        // Recenter at origin after scale
         realBrain.position.sub(center.multiplyScalar(scale));
 
         // Swap: drop the procedural cortex/cerebellum/stem, add the real one.
@@ -708,6 +696,24 @@
         brainGroup.remove(brainstem);
         brainGroup.add(realBrain);
         loadedBrain = realBrain;
+
+        // Reposition all existing nodes to match the real brain's envelope.
+        // The procedural cortex was sized 3.3 x 1.9 x 2.1 (full extents).
+        // The real brain has longest axis = 3.3 (normalized above), other
+        // axes whatever the model has. Scale each node's position so they
+        // stay inside the new envelope.
+        const realSize = new THREE.Box3().setFromObject(realBrain).getSize(new THREE.Vector3());
+        _envelopeScale = {
+          sx: realSize.x / 3.3,
+          sy: realSize.y / 1.9,
+          sz: realSize.z / 2.1,
+        };
+        console.log("brain.glb envelope:", realSize, "node scale:", _envelopeScale);
+        for (const m of _allNodeMeshes) {
+          m.position.x *= _envelopeScale.sx;
+          m.position.y *= _envelopeScale.sy;
+          m.position.z *= _envelopeScale.sz;
+        }
       },
       undefined,
       (err) => {
@@ -842,6 +848,12 @@
           });
           const mesh = new THREE.Mesh(sphereGeom, mat);
           const p = randomPositionInRegion(region);
+          // If GLB loaded first, apply its envelope scale up front.
+          if (_envelopeScale) {
+            p.x *= _envelopeScale.sx;
+            p.y *= _envelopeScale.sy;
+            p.z *= _envelopeScale.sz;
+          }
           mesh.position.copy(p);
           mesh.userData = {
             data: n,
