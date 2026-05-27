@@ -48,7 +48,7 @@
     h1 {
       margin: 0; font-size: 18px; letter-spacing: 3px; font-weight: 600;
       color: var(--text);
-      text-shadow: 0 0 12px rgba(91, 192, 235, 0.35);
+      text-shadow: 0 0 12px rgba(244, 162, 59, 0.45);
     }
     h1 .sub {
       color: var(--sage); font-size: 11px; margin-left: 10px;
@@ -61,7 +61,7 @@
       border: 1px solid var(--surfac2);
       border-radius: 22px;
       padding: 0 12px;
-      box-shadow: 0 0 18px rgba(91, 192, 235, 0.1);
+      box-shadow: 0 0 18px rgba(244, 162, 59, 0.12);
       backdrop-filter: blur(8px);
     }
     .search-wrap input {
@@ -82,7 +82,7 @@
     @media (max-width: 800px) {
       main { grid-template-columns: 1fr; }
       aside.panel { display: none; }
-      aside.panel.open { display: flex; position: fixed; inset: 0; }
+      aside.panel.open { display: flex; position: fixed; inset: 0; z-index: 30; }
     }
 
     /* ---------- BRAIN VIEWPORT ---------- */
@@ -90,122 +90,48 @@
       position: relative; overflow: hidden;
       background: transparent;
     }
-    svg#brain {
+    #brain-canvas {
       width: 100%; height: 100%; display: block;
       cursor: grab;
     }
-    svg#brain:active { cursor: grabbing; }
+    #brain-canvas:active { cursor: grabbing; }
 
-    /* brain anatomy strokes */
-    .anatomy {
-      fill: rgba(91, 192, 235, 0.04);
-      stroke: rgba(91, 192, 235, 0.45);
-      stroke-width: 1.2;
-      stroke-linejoin: round;
-      filter: url(#brainGlow);
-      transition: fill 220ms, stroke 220ms;
-    }
-    .anatomy.region {
-      cursor: pointer;
-      fill: rgba(91, 192, 235, 0.025);
-      stroke: rgba(91, 192, 235, 0.28);
-    }
-    .anatomy.region:hover {
-      fill: rgba(230, 184, 92, 0.06);
-      stroke: rgba(230, 184, 92, 0.55);
-    }
-    .anatomy.region.active {
-      fill: rgba(230, 184, 92, 0.09);
-      stroke: rgba(230, 184, 92, 0.75);
-    }
-    .anatomy.limbic {
-      fill: rgba(244, 162, 59, 0.08);
-      stroke: rgba(244, 162, 59, 0.6);
-    }
-    .anatomy.stem {
-      fill: rgba(244, 228, 181, 0.08);
-      stroke: rgba(244, 228, 181, 0.55);
-    }
-
-    .region-label {
-      fill: var(--sage); font-size: 10px;
-      letter-spacing: 1.5px; text-transform: uppercase;
-      pointer-events: none;
-      opacity: 0.45;
-      transition: opacity 220ms;
-    }
-    .anatomy.region:hover + .region-label,
-    .anatomy.region.active + .region-label { opacity: 1; fill: var(--gold); }
-
-    /* cortex silhouette — unified brain outline that contains lobes */
-    .cortex-outline {
-      fill: none;
-      stroke: rgba(91, 192, 235, 0.70);
-      stroke-width: 2.2;
-      stroke-linejoin: round;
-      filter: url(#brainGlow);
-      pointer-events: none;
-    }
-    .cortex-fill {
-      fill: rgba(91, 192, 235, 0.025);
-      pointer-events: none;
-    }
-    /* sylvian fissure — diagonal separator between temporal & frontal/parietal */
-    .fissure {
-      fill: none;
-      stroke: rgba(91, 192, 235, 0.55);
-      stroke-width: 1.6;
-      stroke-linecap: round;
-      pointer-events: none;
-    }
-    /* gyri — decorative wavy lines for cortex texture */
-    .gyrus {
-      fill: none;
-      stroke: rgba(91, 192, 235, 0.22);
-      stroke-width: 0.9;
-      stroke-linecap: round;
-      pointer-events: none;
-    }
-
-    /* pathways (links) */
-    .pathway {
-      stroke-width: 0.7;
-      fill: none;
+    .viewport-hint {
+      position: absolute; bottom: 18px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 10.5px; color: var(--sage);
+      letter-spacing: 2px; text-transform: uppercase;
       opacity: 0.55;
-      stroke: rgba(91, 192, 235, 0.4);
-      filter: url(#pathwayGlow);
+      pointer-events: none;
+      white-space: nowrap;
+      transition: opacity 400ms;
     }
+    .viewport-hint.dim { opacity: 0; }
 
-    /* nodes */
-    .node circle {
-      stroke: rgba(7, 9, 13, 0.9);
-      stroke-width: 1;
-      cursor: pointer;
-      transition: r 180ms, stroke 180ms, opacity 220ms;
-      filter: url(#nodeGlow);
-    }
-    .node:hover circle {
-      stroke: var(--text);
-      stroke-width: 1.5;
-    }
-    .node.selected circle {
-      stroke: var(--gold);
-      stroke-width: 2.2;
-    }
-    .node text {
-      fill: var(--text);
-      font-size: 9.5px;
+    /* tooltip that floats over a hovered/selected node */
+    .node-tip {
+      position: absolute;
+      background: rgba(7, 9, 13, 0.92);
+      border: 1px solid var(--surfac2);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: var(--text);
+      letter-spacing: 0.3px;
       pointer-events: none;
       opacity: 0;
-      transition: opacity 180ms;
-      text-shadow: 0 0 6px var(--bg), 0 0 4px var(--bg), 0 0 4px var(--bg);
+      transform: translate(8px, 8px);
+      transition: opacity 120ms;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.6);
+      max-width: 260px;
+      z-index: 5;
     }
-    .node:hover text,
-    .node.selected text,
-    .node.matched text { opacity: 1; }
-    .node.matched circle { stroke: var(--gold); stroke-width: 2; }
-    .node.dimmed circle { opacity: 0.18; }
-    .node.dimmed text { opacity: 0; }
+    .node-tip.show { opacity: 1; }
+    .node-tip .tip-region {
+      color: var(--gold); font-size: 9.5px;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      margin-top: 2px;
+    }
 
     /* ---------- SIDE PANEL ---------- */
     aside.panel {
@@ -265,10 +191,7 @@
       margin: 0 0 10px; text-transform: uppercase;
     }
     .panel-section { padding-top: 6px; }
-    #detail-panel {
-      flex: 1;
-      min-height: 200px;
-    }
+    #detail-panel { flex: 1; min-height: 200px; }
     #detail-panel.empty .placeholder {
       color: var(--sage); font-size: 12px;
       font-style: italic; line-height: 1.6;
@@ -306,7 +229,7 @@
       .close-panel { display: block; }
     }
 
-    /* ---------- CONTROLS / FOOTER ---------- */
+    /* ---------- CONTROLS ---------- */
     .controls {
       position: fixed; bottom: 18px; left: 18px;
       display: flex; gap: 8px;
@@ -334,234 +257,58 @@
       color: var(--cyan);
     }
 
-    .breadcrumb {
-      position: fixed; bottom: 20px; left: 50%;
-      transform: translateX(-50%);
-      color: var(--sage); font-size: 11px;
-      letter-spacing: 1.5px;
-      background: rgba(13, 18, 25, 0.7);
-      padding: 6px 14px; border-radius: 14px;
-      border: 1px solid var(--surfac2);
-      backdrop-filter: blur(6px);
+    /* region label overlay (HTML, projected from 3D) */
+    .region-label-overlay {
+      position: absolute;
+      font-size: 10px;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+      color: var(--sage);
       pointer-events: none;
       opacity: 0;
-      transition: opacity 200ms;
-      z-index: 9;
+      transition: opacity 240ms;
+      text-shadow: 0 0 8px rgba(7,9,13,0.9), 0 0 6px rgba(7,9,13,0.9);
+      transform: translate(-50%, -50%);
+      white-space: nowrap;
     }
-    .breadcrumb.show { opacity: 1; }
+    .region-label-overlay.show { opacity: 0.65; }
+    .region-label-overlay.active { opacity: 1; color: var(--gold); }
   </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
 </head>
 <body>
-
   <header class="top">
-    <h1>THEO <span class="sub" id="version"></span></h1>
+    <h1>THEO <span class="sub" id="version">v?</span></h1>
     <div class="search-wrap">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><path d="M11 11l4 4"/></svg>
-      <input id="search" type="text" placeholder="Search tools, skills, idioms…" autocomplete="off" />
+      <input id="search" placeholder="Search nodes…" autocomplete="off"/>
     </div>
   </header>
 
   <main>
-    <div class="brain-viewport">
-      <svg id="brain" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid meet">
-        <defs>
-          <!-- holographic glow filter for the brain wireframe -->
-          <filter id="brainGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="2" result="blur"/>
-            <feMerge>
-              <feMergeNode in="blur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-          <!-- subtler glow for pathway lines -->
-          <filter id="pathwayGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="1.2"/>
-          </filter>
-          <!-- node glow -->
-          <filter id="nodeGlow" x="-100%" y="-100%" width="300%" height="300%">
-            <feGaussianBlur stdDeviation="2.4" result="b"/>
-            <feMerge>
-              <feMergeNode in="b"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-          <!-- limbic / core radial gradient -->
-          <radialGradient id="limbicGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#F4A23B" stop-opacity="0.4"/>
-            <stop offset="60%" stop-color="#F4A23B" stop-opacity="0.12"/>
-            <stop offset="100%" stop-color="#F4A23B" stop-opacity="0"/>
-          </radialGradient>
-
-          <!-- Cortex clip path — every cortical lobe is clipped to this so
-               the lobes appear as sections of one brain rather than free
-               floating ovals. Cerebellum + brain stem are NOT clipped;
-               they're anatomically separate structures. -->
-          <clipPath id="cortex-clip">
-            <path d="
-              M 130,365
-              C 100,280 130,185 220,138
-              C 320,102 440,95  540,98
-              C 660,102 760,135 825,205
-              C 880,265 895,345 865,410
-              C 835,470 770,492 700,488
-              C 660,487 638,495 612,508
-              C 555,530 490,535 425,528
-              C 350,520 265,500 195,468
-              C 150,445 120,415 125,380
-              Z"/>
-          </clipPath>
-        </defs>
-
-        <!-- Camera group (everything zoomed/panned) -->
-        <g id="camera">
-
-          <!-- ============================================================
-               BRAIN SILHOUETTE — side view, right-facing.
-               One unified cortex outline contains seven cortical lobes
-               (frontal, motor, parietal, occipital, temporal, broca,
-               wernicke) clipped to the cortex shape. Cerebellum, brain
-               stem, and limbic are separate structures.
-          ============================================================ -->
-
-          <!-- Cortex backdrop fill (subtle base color under the lobes) -->
-          <path class="cortex-fill" d="
-            M 130,365
-            C 100,280 130,185 220,138
-            C 320,102 440,95  540,98
-            C 660,102 760,135 825,205
-            C 880,265 895,345 865,410
-            C 835,470 770,492 700,488
-            C 660,487 638,495 612,508
-            C 555,530 490,535 425,528
-            C 350,520 265,500 195,468
-            C 150,445 120,415 125,380
-            Z"/>
-
-          <!-- Lobe regions — drawn as overlapping rectangles, clipped to
-               the cortex shape. Order matters: later lobes paint on top. -->
-          <g clip-path="url(#cortex-clip)">
-
-            <!-- Frontal lobe (front-left wedge) -->
-            <path class="anatomy region" data-region="frontal" d="
-              M 60,80 L 425,80 L 425,560 L 60,560 Z"/>
-            <text class="region-label" x="245" y="300" text-anchor="middle">Frontal — Voice / Identity</text>
-
-            <!-- Motor strip (narrow vertical band along the central sulcus) -->
-            <path class="anatomy region" data-region="motor" d="
-              M 425,80 L 500,80 L 500,560 L 425,560 Z"/>
-            <text class="region-label" x="462" y="155" text-anchor="middle">Motor</text>
-
-            <!-- Parietal lobe (top-middle, between motor strip & occipital) -->
-            <path class="anatomy region" data-region="parietal" d="
-              M 500,80 L 730,80 L 730,418 L 500,418 Z"/>
-            <text class="region-label" x="610" y="260" text-anchor="middle">Parietal — Memory</text>
-
-            <!-- Occipital lobe (back wedge) -->
-            <path class="anatomy region" data-region="occipital" d="
-              M 730,80 L 970,80 L 970,520 L 730,520 Z"/>
-            <text class="region-label" x="800" y="310" text-anchor="middle">Occipital — Vision</text>
-
-            <!-- Temporal lobe (lower-front, below the Sylvian fissure) -->
-            <path class="anatomy region" data-region="temporal" d="
-              M 60,418 L 700,418 L 700,560 L 60,560 Z"/>
-            <text class="region-label" x="430" y="490" text-anchor="middle">Temporal — Episodic Memory</text>
-
-            <!-- Broca's area (lower-front of frontal lobe) — drawn ON TOP -->
-            <path class="anatomy region" data-region="broca" d="
-              M 155,422 L 295,422 L 295,495 L 155,495 Z"/>
-            <text class="region-label" x="225" y="462" text-anchor="middle">Broca — Skills</text>
-
-            <!-- Wernicke's area (upper-back of temporal) — drawn ON TOP -->
-            <path class="anatomy region" data-region="wernicke" d="
-              M 540,420 L 650,420 L 650,478 L 540,478 Z"/>
-            <text class="region-label" x="595" y="455" text-anchor="middle">Wernicke — Research</text>
-
-            <!-- Decorative gyri — wavy parallel lines for the wrinkled
-                 cortex look. pointer-events: none so they don't block clicks. -->
-            <g class="gyri">
-              <path class="gyrus" d="M 170,175 Q 230,150 290,175 T 410,175 T 530,175 T 650,175 T 770,175"/>
-              <path class="gyrus" d="M 140,240 Q 210,215 280,240 T 420,240 T 560,240 T 700,240 T 830,240"/>
-              <path class="gyrus" d="M 130,310 Q 210,285 290,310 T 450,310 T 610,310 T 770,310 T 870,310"/>
-              <path class="gyrus" d="M 145,380 Q 230,355 315,380 T 485,380 T 655,380 T 825,380"/>
-              <path class="gyrus" d="M 180,460 Q 260,435 340,460 T 500,460 T 660,460 T 800,460"/>
-              <path class="gyrus" d="M 240,510 Q 320,490 400,510 T 560,510 T 680,510"/>
-            </g>
-          </g>
-
-          <!-- Sylvian fissure — bold diagonal curve separating temporal
-               (below) from frontal/parietal (above). Drawn on top of lobes. -->
-          <path class="fissure" d="
-            M 145,418
-            C 270,398 440,398 600,418
-            C 660,428 700,440 740,460"/>
-
-          <!-- Cortex outline stroke — the unified brain silhouette,
-               drawn LAST so it sits on top and frames the whole shape. -->
-          <path class="cortex-outline" d="
-            M 130,365
-            C 100,280 130,185 220,138
-            C 320,102 440,95  540,98
-            C 660,102 760,135 825,205
-            C 880,265 895,345 865,410
-            C 835,470 770,492 700,488
-            C 660,487 638,495 612,508
-            C 555,530 490,535 425,528
-            C 350,520 265,500 195,468
-            C 150,445 120,415 125,380
-            Z"/>
-
-          <!-- Cerebellum — separate cauliflower at back-bottom -->
-          <path class="anatomy region" data-region="cerebellum" d="
-            M 685,500
-            C 720,495 800,505 845,545
-            C 875,575 875,625 830,648
-            C 770,668 695,655 665,620
-            C 638,585 645,520 685,500
-            Z"/>
-          <text class="region-label" x="765" y="585" text-anchor="middle">Cerebellum — Drift</text>
-
-          <!-- Cerebellum inner fold lines (the cauliflower texture) -->
-          <g class="cerebellum-folds" style="pointer-events:none">
-            <path class="gyrus" d="M 680,525 Q 720,510 770,525 T 845,535"/>
-            <path class="gyrus" d="M 668,560 Q 720,545 780,560 T 855,575"/>
-            <path class="gyrus" d="M 665,595 Q 720,580 780,595 T 845,615"/>
-            <path class="gyrus" d="M 685,630 Q 740,615 795,630 T 840,640"/>
-          </g>
-
-          <!-- Brain stem — narrow tube descending from cortex base -->
-          <path class="anatomy stem region" data-region="brainstem" d="
-            M 480,520
-            C 478,560 478,620 488,680
-            C 498,718 552,718 562,680
-            C 572,620 572,560 570,520
-            C 555,515 495,515 480,520
-            Z"/>
-          <text class="region-label" x="525" y="650" text-anchor="middle">Brain stem — Core</text>
-
-          <!-- Limbic system — deep inner structure, drawn over the cortex -->
-          <ellipse cx="500" cy="380" rx="120" ry="60" fill="url(#limbicGlow)" filter="url(#brainGlow)"/>
-          <ellipse class="anatomy limbic region" data-region="limbic" cx="500" cy="380" rx="115" ry="57"/>
-          <text class="region-label" x="500" y="384" text-anchor="middle">Limbic — Self / Human / Narrative</text>
-
-          <!-- Pathway and node groups (populated by JS) -->
-          <g id="pathways"></g>
-          <g id="nodes"></g>
-
-        </g>
-      </svg>
-
+    <div class="brain-viewport" id="viewport">
+      <canvas id="brain-canvas"></canvas>
+      <div class="node-tip" id="tip"><div class="tip-label"></div><div class="tip-region"></div></div>
+      <div class="viewport-hint" id="hint">drag · rotate &nbsp; · &nbsp; scroll · zoom &nbsp; · &nbsp; click · inspect</div>
       <div class="empty-state" id="empty" style="display:none">
         No <code>brain.json</code> found.<br/><br/>
         From the repo: <code>python -m scripts.dump_brain</code><br/>
         then <code>flutter build web &amp;&amp; firebase deploy</code>.
       </div>
-
       <div class="controls">
-        <button class="ctrl-btn" id="zoom-fit" title="Fit brain to view">⊡</button>
-        <button class="ctrl-btn" id="zoom-in" title="Zoom in">+</button>
+        <button class="ctrl-btn" id="zoom-fit" title="Reset view">⊡</button>
+        <button class="ctrl-btn" id="zoom-in"  title="Zoom in">+</button>
         <button class="ctrl-btn" id="zoom-out" title="Zoom out">−</button>
+        <button class="ctrl-btn" id="auto-rotate" title="Toggle auto-rotate">↻</button>
       </div>
-      <div class="breadcrumb" id="breadcrumb"></div>
     </div>
 
     <aside class="panel" id="panel">
@@ -584,415 +331,688 @@
       <div class="panel-section" id="detail-panel">
         <h3>Selection</h3>
         <div class="placeholder">
-          Click a region or a node in the brain. Each region maps to a
-          functional zone — Frontal carries voice and identity, Limbic
-          holds the self-model and the relationship, Motor cortex is
-          where the tools live, Cerebellum is drift detection. Search
-          finds anything by name; pinned nodes pulse.
+          Drag to rotate. Scroll to zoom. Click a node to inspect.
+          Each lobe carries a category — Frontal for voice and identity,
+          Limbic for the self-model and the relationship, Motor cortex
+          for tools, Cerebellum for drift detection.
         </div>
       </div>
     </aside>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-  <script>
-  // -------------------------------------------------------------------
-  // ANATOMY → CATEGORY MAPPING
-  // Each Theo category lands in one anatomical region. Coordinates
-  // are the rough center of that region in the SVG viewBox (1000x800).
-  // -------------------------------------------------------------------
-  const REGIONS = {
-    frontal:    { cx: 245, cy: 320, rx: 130, ry: 105, label: "Frontal" },
-    motor:      { cx: 510, cy: 155, rx: 130, ry:  40, label: "Motor"   },
-    parietal:   { cx: 560, cy: 265, rx: 140, ry:  80, label: "Parietal"},
-    temporal:   { cx: 490, cy: 495, rx: 175, ry:  65, label: "Temporal"},
-    wernicke:   { cx: 572, cy: 455, rx:  45, ry:  25, label: "Wernicke"},
-    occipital:  { cx: 775, cy: 300, rx:  65, ry:  90, label: "Occipital"},
-    broca:      { cx: 200, cy: 450, rx:  55, ry:  35, label: "Broca"   },
-    cerebellum: { cx: 760, cy: 575, rx:  75, ry:  55, label: "Cerebellum"},
-    brainstem:  { cx: 525, cy: 645, rx:  55, ry:  75, label: "Brain stem"},
-    limbic:     { cx: 500, cy: 380, rx: 110, ry:  58, label: "Limbic"  },
-  };
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+    import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+    import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
-  const CATEGORY_TO_REGION = {
-    // Layer 1 + core identity
-    "core":                        "brainstem",
-    "voice":                       "frontal",
-    "principles":                  "frontal",
-    // Tools — Motor cortex (action surfaces)
-    "toolgroup:trading":           "motor",
-    "toolgroup:safety":            "cerebellum",
-    "toolgroup:system":            "motor",
-    "toolgroup:identity":          "frontal",
-    "toolgroup:web":               "motor",
-    "toolgroup:introspection":     "limbic",
-    "toolgroup:osint":             "motor",
-    "toolgroup:finance":           "motor",
-    "toolgroup:server_metrics":    "motor",
-    "toolgroup:security":          "cerebellum",
-    "toolgroup:browser":           "motor",
-    "toolgroup:skills":            "broca",
-    "toolgroup:diagrams":          "motor",
-    "toolgroup:file_sync":         "motor",
-    "toolgroup:chess":             "frontal",
-    "toolgroup:file_transfer":     "motor",
-    "toolgroup:image_gen":         "occipital",
-    "toolgroup:qr":                "motor",
-    "toolgroup:ascii":             "occipital",
-    "toolgroup:vision":            "occipital",
-    "toolgroup:register_check":    "limbic",
-    // Skills / Research — research lives in the larger temporal lobe;
-    // Wernicke is too small to hold 40+ repo nodes cleanly.
-    "skills":                      "broca",
-    "research":                    "temporal",
-    // Memory + introspective surfaces (limbic core)
-    "memory":                      "limbic",
-    "threads":                     "frontal",
-  };
+    // =================================================================
+    // CONFIG — region centers in 3D space + category mapping.
+    // =================================================================
+    // Brain extends along X: +X = anterior (frontal), -X = posterior (occipital).
+    // Y: +Y = superior (top), -Y = inferior (bottom).
+    // Z: lateral (depth, points toward viewer in default camera).
+    const REGIONS = {
+      frontal:    { cx:  1.55, cy:  0.55, cz: 0.55, rx: 0.65, ry: 0.55, rz: 0.55, label: "Frontal — Voice / Identity" },
+      motor:      { cx:  0.35, cy:  1.05, cz: 0.45, rx: 0.55, ry: 0.20, rz: 0.55, label: "Motor — Tools" },
+      parietal:   { cx: -0.45, cy:  0.95, cz: 0.55, rx: 0.55, ry: 0.30, rz: 0.55, label: "Parietal — Memory" },
+      occipital:  { cx: -1.75, cy:  0.20, cz: 0.45, rx: 0.45, ry: 0.55, rz: 0.45, label: "Occipital — Vision" },
+      temporal:   { cx:  0.30, cy: -0.55, cz: 0.65, rx: 0.95, ry: 0.30, rz: 0.50, label: "Temporal — Episodic" },
+      wernicke:   { cx: -0.75, cy: -0.10, cz: 0.65, rx: 0.30, ry: 0.20, rz: 0.30, label: "Wernicke — Research" },
+      broca:      { cx:  1.40, cy: -0.25, cz: 0.55, rx: 0.30, ry: 0.20, rz: 0.30, label: "Broca — Skills" },
+      cerebellum: { cx: -1.55, cy: -0.75, cz: 0.20, rx: 0.45, ry: 0.30, rz: 0.40, label: "Cerebellum — Drift" },
+      brainstem:  { cx: -0.20, cy: -1.40, cz: 0.00, rx: 0.18, ry: 0.30, rz: 0.18, label: "Brain stem — Core" },
+      limbic:     { cx:  0.05, cy:  0.05, cz: 0.00, rx: 0.40, ry: 0.30, rz: 0.40, label: "Limbic — Self / Human / Narrative" },
+    };
 
-  // Region-specific colors. Holographic palette built around amber/cyan.
-  const REGION_COLOR = {
-    frontal:    "#B2A4FF",  // lavender — voice + identity
-    motor:      "#7BDFA0",  // green-cyan — tools / action
-    parietal:   "#A0B0A6",  // sage — memory
-    temporal:   "#9DC1B7",  // muted teal — episodic
-    wernicke:   "#A0B0A6",  // sage — research
-    occipital:  "#9D7BCF",  // violet — vision
-    broca:      "#E6B85C",  // gold — skills
-    cerebellum: "#E57373",  // red — drift / caution
-    brainstem:  "#F4E4B5",  // pale gold — Layer 1 core
-    limbic:     "#F4A23B",  // amber — personality core
-  };
+    const CATEGORY_TO_REGION = {
+      "core":                        "brainstem",
+      "voice":                       "frontal",
+      "principles":                  "frontal",
+      "toolgroup:trading":           "motor",
+      "toolgroup:safety":            "cerebellum",
+      "toolgroup:system":            "motor",
+      "toolgroup:identity":          "frontal",
+      "toolgroup:web":               "motor",
+      "toolgroup:introspection":     "limbic",
+      "toolgroup:osint":             "motor",
+      "toolgroup:finance":           "motor",
+      "toolgroup:server_metrics":    "motor",
+      "toolgroup:security":          "cerebellum",
+      "toolgroup:browser":           "motor",
+      "toolgroup:skills":            "broca",
+      "toolgroup:diagrams":          "motor",
+      "toolgroup:file_sync":         "motor",
+      "toolgroup:chess":             "frontal",
+      "toolgroup:file_transfer":     "motor",
+      "toolgroup:image_gen":         "occipital",
+      "toolgroup:qr":                "motor",
+      "toolgroup:ascii":             "occipital",
+      "toolgroup:vision":            "occipital",
+      "toolgroup:register_check":    "limbic",
+      "skills":                      "broca",
+      "research":                    "temporal",
+      "memory":                      "limbic",
+      "threads":                     "frontal",
+    };
 
-  // -------------------------------------------------------------------
-  // LOAD + RENDER
-  // -------------------------------------------------------------------
-  let _allNodes = [];
-  let _allLinks = [];
-  let _sim = null;
-  let _zoom = null;
-  let _selected = null;
+    const REGION_COLOR = {
+      frontal:    0xB2A4FF,
+      motor:      0x7BDFA0,
+      parietal:   0xA0B0A6,
+      temporal:   0x9DC1B7,
+      wernicke:   0xA0B0A6,
+      occipital:  0x9D7BCF,
+      broca:      0xE6B85C,
+      cerebellum: 0xE57373,
+      brainstem:  0xF4E4B5,
+      limbic:     0xF4A23B,
+    };
 
-  fetch("brain.json", { cache: "no-cache" })
-    .then(r => { if (!r.ok) throw new Error("brain.json missing"); return r.json(); })
-    .then(render)
-    .catch(() => { document.getElementById("empty").style.display = "grid"; });
+    // =================================================================
+    // PSEUDO-NOISE — cheap 3D noise for vertex displacement.
+    // Not real simplex; layered sin/cos that produces smooth bumps.
+    // =================================================================
+    function noise3d(x, y, z) {
+      return (
+        Math.sin(x * 1.3 + Math.cos(y * 0.7 + z * 0.4)) *
+        Math.cos(z * 1.1 + Math.sin(x * 0.5 + y * 0.6)) * 0.55
+        + Math.sin(x * 2.7 + y * 1.3) * Math.cos(z * 2.1 + y * 1.7) * 0.30
+        + Math.sin(x * 5.3 + z * 3.1) * Math.cos(y * 4.7 + x * 2.3) * 0.15
+      );
+    }
 
-  function render(data) {
-    populatePortrait(data);
-    populateStats(data);
-    buildGraph(data);
-    setupZoom();
-    setupSearch();
-    setupRegionClicks();
-    setupCloseButton();
-  }
+    // =================================================================
+    // SCENE SETUP
+    // =================================================================
+    const viewport = document.getElementById("viewport");
+    const canvas   = document.getElementById("brain-canvas");
 
-  function populatePortrait(data) {
-    const v = data.identity_version || "?";
-    document.getElementById("version").textContent =
-      `v${v} · ${(data.generated_at || "").replace("T"," ").slice(0,16)}`;
-    document.getElementById("theo-version").textContent = `v${v}`;
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x02030a, 0.06);
 
-    // Name from stats if it's surfaced; otherwise fall back to "Theo"
-    // The dump_brain script doesn't include name + voice yet — placeholder.
-    const name = (data.name) || "Theo";
-    const voice = (data.voice) || "voice: not picked yet";
-    document.getElementById("theo-name").textContent = name;
-    document.getElementById("theo-voice").textContent = voice;
-    document.getElementById("avatar").textContent = name.charAt(0).toUpperCase();
-  }
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+    camera.position.set(0.0, 0.4, 7.2);
 
-  function populateStats(data) {
-    const s = data.stats || {};
-    const order = [
-      ["tools",         "tools"],
-      ["transcripts",   "sessions"],
-      ["memory_chunks", "chunks"],
-      ["idioms",        "idioms"],
-      ["open_threads",  "open threads"],
-      ["pinned",        "pinned"],
-    ];
-    const html = order
-      .filter(([k]) => s[k] !== undefined)
-      .map(([k, label]) => `
-        <div class="stat-card">
-          <b>${typeof s[k] === "number" ? s[k].toLocaleString() : s[k]}</b>
-          <span>${label}</span>
-        </div>`)
-      .join("");
-    document.getElementById("stats").innerHTML = html;
-  }
+    const renderer = new THREE.WebGLRenderer({
+      canvas, antialias: true, alpha: true,
+      powerPreference: "high-performance",
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x000000, 0);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
 
-  function buildGraph(data) {
-    const nodes = [];
-    const links = [];
+    // Postprocessing — UnrealBloomPass gives the holographic glow.
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloom = new UnrealBloomPass(
+      new THREE.Vector2(1, 1),
+      0.95,   // strength
+      0.85,   // radius
+      0.18,   // threshold (low = lots of bloom)
+    );
+    composer.addPass(bloom);
 
-    for (const cat of data.categories || []) {
-      const region = CATEGORY_TO_REGION[cat.id] || "limbic";
-      for (const n of cat.nodes || []) {
-        nodes.push({
-          ...n,
-          group: cat.id,
-          region,
-          categoryLabel: cat.label,
-        });
+    // Controls
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.rotateSpeed = 0.7;
+    controls.minDistance = 3.5;
+    controls.maxDistance = 14;
+    controls.target.set(0, 0, 0);
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.45;
+
+    // Pause auto-rotate when the user is interacting.
+    let autoRotateOn = true;
+    let userInteracting = false;
+    controls.addEventListener("start", () => { userInteracting = true; });
+    controls.addEventListener("end",   () => { userInteracting = false; });
+
+    function resize() {
+      const w = viewport.clientWidth;
+      const h = viewport.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h, false);
+      composer.setSize(w, h);
+      bloom.setSize(w, h);
+    }
+    window.addEventListener("resize", resize);
+
+    // =================================================================
+    // BRAIN GEOMETRY — procedural cortex, cerebellum, stem, limbic.
+    // =================================================================
+    const brainGroup = new THREE.Group();
+    scene.add(brainGroup);
+
+    // ---- CORTEX (the big bumpy mass) ----
+    function buildCortex() {
+      const geom = new THREE.IcosahedronGeometry(1.0, 7);  // ~5120 triangles
+      const pos = geom.attributes.position;
+      const v = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+
+        // Layered noise displacement → gyri/sulci texture
+        const n1 = noise3d(v.x * 2.2, v.y * 2.2, v.z * 2.2);
+        const n2 = noise3d(v.x * 5.5, v.y * 5.5, v.z * 5.5);
+        const n3 = noise3d(v.x * 11.0, v.y * 11.0, v.z * 11.0);
+        const displacement = n1 * 0.08 + n2 * 0.035 + n3 * 0.018;
+        v.multiplyScalar(1 + displacement);
+
+        // Elongate anterior-posterior, slightly flatten top-bottom
+        v.x *= 1.65;
+        v.y *= 0.95;
+        v.z *= 1.05;
+
+        // Longitudinal fissure — deep dip along the top midline (z=0)
+        const topness = Math.max(0, v.y - 0.25);
+        const midness = Math.max(0, 1 - Math.abs(v.z) / 0.18);
+        v.y -= topness * midness * 0.22;
+
+        // Temporal lobe bulge — pull mid-low area slightly down/out
+        if (v.y < -0.2 && v.y > -0.95 && Math.abs(v.x) < 1.4) {
+          v.y -= 0.05;
+        }
+
+        // Carve out cerebellum area in back-bottom
+        if (v.x < -1.0 && v.y < -0.4) {
+          v.y += 0.18 * Math.max(0, (-1.0 - v.x));
+        }
+
+        pos.setXYZ(i, v.x, v.y, v.z);
+      }
+      pos.needsUpdate = true;
+      geom.computeVertexNormals();
+
+      // Two materials layered: wireframe overlay + faint solid underneath
+      // for the holographic feel.
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xF4A23B,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.55,
+      });
+      const innerMat = new THREE.MeshBasicMaterial({
+        color: 0xF4A23B,
+        transparent: true,
+        opacity: 0.06,
+        side: THREE.BackSide,
+        depthWrite: false,
+      });
+
+      const mesh = new THREE.Mesh(geom, mat);
+      const inner = new THREE.Mesh(geom, innerMat);
+      const g = new THREE.Group();
+      g.add(inner);
+      g.add(mesh);
+      return g;
+    }
+
+    // ---- CEREBELLUM (cauliflower at back-bottom) ----
+    function buildCerebellum() {
+      const geom = new THREE.IcosahedronGeometry(0.55, 5);
+      const pos = geom.attributes.position;
+      const v = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        // Higher frequency noise for the tighter parallel-fold pattern
+        const n = noise3d(v.x * 8, v.y * 14, v.z * 8) * 0.08
+                + noise3d(v.x * 18, v.y * 18, v.z * 18) * 0.025;
+        v.multiplyScalar(1 + n);
+        v.x *= 1.05;
+        v.y *= 0.75;
+        pos.setXYZ(i, v.x, v.y, v.z);
+      }
+      pos.needsUpdate = true;
+      geom.computeVertexNormals();
+
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xE57373,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.55,
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.set(-1.6, -0.65, 0);
+      return mesh;
+    }
+
+    // ---- BRAIN STEM (tube hanging down) ----
+    function buildBrainstem() {
+      const geom = new THREE.CylinderGeometry(0.18, 0.30, 1.1, 16, 6, false);
+      const pos = geom.attributes.position;
+      const v = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        const n = noise3d(v.x * 6, v.y * 4, v.z * 6) * 0.04;
+        v.x *= 1 + n;
+        v.z *= 1 + n;
+        pos.setXYZ(i, v.x, v.y, v.z);
+      }
+      pos.needsUpdate = true;
+      geom.computeVertexNormals();
+
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xF4E4B5,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.5,
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.set(-0.25, -1.25, 0);
+      mesh.rotation.x = 0.15;
+      return mesh;
+    }
+
+    // ---- LIMBIC CORE (glowing sphere inside) ----
+    function buildLimbicCore() {
+      const g = new THREE.Group();
+      const inner = new THREE.Mesh(
+        new THREE.SphereGeometry(0.36, 32, 32),
+        new THREE.MeshBasicMaterial({
+          color: 0xFFD27A,
+          transparent: true,
+          opacity: 0.85,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        }),
+      );
+      const outer = new THREE.Mesh(
+        new THREE.SphereGeometry(0.62, 32, 32),
+        new THREE.MeshBasicMaterial({
+          color: 0xF4A23B,
+          transparent: true,
+          opacity: 0.18,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        }),
+      );
+      const halo = new THREE.Mesh(
+        new THREE.SphereGeometry(1.05, 32, 32),
+        new THREE.MeshBasicMaterial({
+          color: 0xF4A23B,
+          transparent: true,
+          opacity: 0.05,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        }),
+      );
+      g.add(inner);
+      g.add(outer);
+      g.add(halo);
+      g.position.set(0.05, 0.05, 0);
+      return g;
+    }
+
+    // ---- OUTER BRAIN HALO (volumetric glow around whole brain) ----
+    function buildBrainHalo() {
+      const geom = new THREE.SphereGeometry(2.3, 32, 32);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xF4A23B,
+        transparent: true,
+        opacity: 0.03,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.BackSide,
+      });
+      return new THREE.Mesh(geom, mat);
+    }
+
+    const cortex      = buildCortex();
+    const cerebellum  = buildCerebellum();
+    const brainstem   = buildBrainstem();
+    const limbicCore  = buildLimbicCore();
+    const brainHalo   = buildBrainHalo();
+
+    brainGroup.add(brainHalo);
+    brainGroup.add(cortex);
+    brainGroup.add(cerebellum);
+    brainGroup.add(brainstem);
+    brainGroup.add(limbicCore);
+
+    // =================================================================
+    // NODES — one Mesh per node, positioned in its region's volume.
+    // =================================================================
+    const nodesGroup = new THREE.Group();
+    scene.add(nodesGroup);
+
+    // Particle background — sparse stars for the "lab atmosphere"
+    function buildStarfield() {
+      const N = 220;
+      const positions = new Float32Array(N * 3);
+      for (let i = 0; i < N; i++) {
+        const r = 8 + Math.random() * 12;
+        const theta = Math.random() * Math.PI * 2;
+        const phi   = Math.acos(2 * Math.random() - 1);
+        positions[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+        positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta) * 0.4;
+        positions[i*3+2] = r * Math.cos(phi);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      const m = new THREE.PointsMaterial({
+        color: 0x5BC0EB,
+        size: 0.03,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.45,
+      });
+      return new THREE.Points(g, m);
+    }
+    scene.add(buildStarfield());
+
+    // =================================================================
+    // STATE
+    // =================================================================
+    let _allNodeMeshes = [];   // [{mesh, data, baseColor, baseScale}]
+    let _hovered = null;
+    let _selected = null;
+    let _data = null;
+    const tip = document.getElementById("tip");
+    const hint = document.getElementById("hint");
+
+    // Hide drag-hint after first interaction
+    let interactionCount = 0;
+    function fadeHint() {
+      interactionCount += 1;
+      if (interactionCount >= 2) hint.classList.add("dim");
+    }
+    canvas.addEventListener("pointerdown", fadeHint);
+    canvas.addEventListener("wheel", fadeHint, { passive: true });
+
+    // =================================================================
+    // DATA LOAD
+    // =================================================================
+    fetch("brain.json", { cache: "no-cache" })
+      .then(r => { if (!r.ok) throw new Error("missing"); return r.json(); })
+      .then(render)
+      .catch(() => { document.getElementById("empty").style.display = "grid"; });
+
+    function render(data) {
+      _data = data;
+      populatePortrait(data);
+      populateStats(data);
+      buildNodes(data);
+      setupSearch();
+      setupCloseButton();
+      setupControls();
+    }
+
+    function populatePortrait(data) {
+      const v = data.identity_version || "?";
+      document.getElementById("version").textContent =
+        `v${v} · ${(data.generated_at || "").replace("T"," ").slice(0,16)}`;
+      document.getElementById("theo-version").textContent = `v${v}`;
+      const name = data.name || "Theo";
+      const voice = data.voice || "voice: not picked yet";
+      document.getElementById("theo-name").textContent = name;
+      document.getElementById("theo-voice").textContent = voice;
+      document.getElementById("avatar").textContent = name.charAt(0).toUpperCase();
+    }
+
+    function populateStats(data) {
+      const s = data.stats || {};
+      const order = [
+        ["tools",         "tools"],
+        ["transcripts",   "sessions"],
+        ["memory_chunks", "chunks"],
+        ["idioms",        "idioms"],
+        ["open_threads",  "open threads"],
+        ["pinned",        "pinned"],
+      ];
+      const html = order
+        .filter(([k]) => s[k] !== undefined)
+        .map(([k, label]) => `
+          <div class="stat-card">
+            <b>${typeof s[k] === "number" ? s[k].toLocaleString() : s[k]}</b>
+            <span>${label}</span>
+          </div>`)
+        .join("");
+      document.getElementById("stats").innerHTML = html;
+    }
+
+    // ---- Build all node meshes ----
+    function buildNodes(data) {
+      // Clear any existing
+      while (nodesGroup.children.length) {
+        const m = nodesGroup.children.pop();
+        m.geometry?.dispose?.();
+        m.material?.dispose?.();
+      }
+      _allNodeMeshes = [];
+
+      const sphereGeom = new THREE.SphereGeometry(0.05, 12, 12);
+
+      // For each category → each node → place a small sphere in region volume
+      for (const cat of data.categories || []) {
+        const regionId = CATEGORY_TO_REGION[cat.id] || "limbic";
+        const region   = REGIONS[regionId];
+        const colorHex = REGION_COLOR[regionId] || 0xE6B85C;
+        if (!region) continue;
+        for (const n of (cat.nodes || [])) {
+          const mat = new THREE.MeshBasicMaterial({
+            color: colorHex,
+            transparent: true,
+            opacity: 0.92,
+          });
+          const mesh = new THREE.Mesh(sphereGeom, mat);
+          const p = randomPositionInRegion(region);
+          mesh.position.copy(p);
+          mesh.userData = {
+            data: n,
+            region: regionId,
+            categoryLabel: cat.label,
+            baseColor: colorHex,
+            baseScale: 1.0,
+          };
+          nodesGroup.add(mesh);
+          _allNodeMeshes.push(mesh);
+        }
       }
     }
 
-    // Build implicit links — each node links to a fictitious region anchor.
-    // d3 force will pull nodes toward their region center using forceX/Y
-    // anchors rather than visible links between every pair.
-    // Visible pathways: ONE pathway from limbic to each region center,
-    // suggesting how the core radiates outward.
-    const drawnRegions = new Set(nodes.map(n => n.region));
-    drawnRegions.delete("limbic");
-    for (const r of drawnRegions) {
-      links.push({ source: "anchor_limbic", target: `anchor_${r}`, fromRegion: "limbic", toRegion: r });
+    function randomPositionInRegion(r) {
+      // Reject-sample within an ellipsoid for nicer distribution.
+      let v;
+      for (let i = 0; i < 10; i++) {
+        const x = (Math.random() * 2 - 1);
+        const y = (Math.random() * 2 - 1);
+        const z = (Math.random() * 2 - 1);
+        if (x*x + y*y + z*z <= 1) {
+          v = new THREE.Vector3(
+            r.cx + x * r.rx,
+            r.cy + y * r.ry,
+            r.cz + z * r.rz,
+          );
+          break;
+        }
+      }
+      if (!v) v = new THREE.Vector3(r.cx, r.cy, r.cz);
+      return v;
     }
 
-    _allNodes = nodes;
-    _allLinks = links;
+    // =================================================================
+    // RAYCASTER — hover + click on nodes
+    // =================================================================
+    const raycaster = new THREE.Raycaster();
+    raycaster.params.Points = { threshold: 0.05 };
+    const pointer = new THREE.Vector2();
 
-    // d3 force simulation. Anchor strength dialed by region size —
-    // big regions (temporal, parietal) get gentler anchors so nodes
-    // spread to fill them. Small regions (broca, occipital) get
-    // stronger anchors to keep nodes inside.
-    _sim = d3.forceSimulation(nodes)
-      .force("x", d3.forceX(d => REGIONS[d.region].cx)
-        .strength(d => {
-          const r = REGIONS[d.region];
-          return Math.min(r.rx, r.ry) < 60 ? 0.22 : 0.10;
-        }))
-      .force("y", d3.forceY(d => REGIONS[d.region].cy)
-        .strength(d => {
-          const r = REGIONS[d.region];
-          return Math.min(r.rx, r.ry) < 60 ? 0.22 : 0.10;
-        }))
-      .force("collide", d3.forceCollide().radius(6).strength(0.9))
-      .force("charge", d3.forceManyBody().strength(-8))
-      .alpha(0.9)
-      .alphaDecay(0.025);
+    function pickAt(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = ((clientX - rect.left) / rect.width)  * 2 - 1;
+      pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObjects(_allNodeMeshes, false);
+      return hits.length ? hits[0].object : null;
+    }
 
-    const pathwayG = d3.select("#pathways");
-    const nodeG = d3.select("#nodes");
-
-    // Draw region-to-region pathways (using REGION centers, not nodes)
-    pathwayG.selectAll("path.pathway")
-      .data(links).join("path")
-        .attr("class", "pathway")
-        .attr("d", l => pathwayPath(REGIONS["limbic"], REGIONS[l.toRegion]));
-
-    // Draw nodes
-    const node = nodeG.selectAll("g.node")
-      .data(nodes, d => d.id).join("g")
-        .attr("class", "node")
-        .attr("data-id", d => d.id)
-        .on("click", (e, d) => { e.stopPropagation(); selectNode(d); });
-
-    node.append("circle")
-      .attr("r", 3.5)
-      .attr("fill", d => REGION_COLOR[d.region] || "#B2A4FF");
-
-    node.append("text")
-      .attr("x", 6)
-      .attr("y", 3)
-      .text(d => truncate(d.label, 28));
-
-    _sim.on("tick", () => {
-      node.attr("transform", d => `translate(${d.x},${d.y})`);
-    });
-  }
-
-  function pathwayPath(a, b) {
-    // Subtle curved pathway between two region centers
-    const mx = (a.cx + b.cx) / 2;
-    const my = (a.cy + b.cy) / 2;
-    const dx = b.cx - a.cx, dy = b.cy - a.cy;
-    // Perpendicular offset for curve
-    const off = 30;
-    const norm = Math.hypot(dx, dy) || 1;
-    const ox = -dy / norm * off, oy = dx / norm * off;
-    return `M ${a.cx},${a.cy} Q ${mx + ox},${my + oy} ${b.cx},${b.cy}`;
-  }
-
-  function truncate(s, n) {
-    s = String(s || "");
-    return s.length > n ? s.slice(0, n - 1) + "…" : s;
-  }
-
-  // -------------------------------------------------------------------
-  // ZOOM
-  // -------------------------------------------------------------------
-  function setupZoom() {
-    const svg = d3.select("#brain");
-    const camera = d3.select("#camera");
-    _zoom = d3.zoom()
-      .scaleExtent([0.6, 6])
-      .on("zoom", (e) => camera.attr("transform", e.transform));
-    svg.call(_zoom);
-    // Fit initially
-    svg.call(_zoom.transform, d3.zoomIdentity);
-
-    d3.select("#zoom-in").on("click", () => svg.transition().call(_zoom.scaleBy, 1.4));
-    d3.select("#zoom-out").on("click", () => svg.transition().call(_zoom.scaleBy, 0.7));
-    d3.select("#zoom-fit").on("click", () => {
-      svg.transition().call(_zoom.transform, d3.zoomIdentity);
-      clearBreadcrumb();
-    });
-  }
-
-  function zoomToRegion(regionId) {
-    const r = REGIONS[regionId];
-    if (!r) return;
-    const svg = d3.select("#brain");
-    const w = 1000, h = 800;
-    // Aim for ~2.4x zoom on the region
-    const scale = 2.4;
-    const tx = w/2 - r.cx * scale;
-    const ty = h/2 - r.cy * scale;
-    svg.transition().duration(700)
-       .call(_zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
-    setBreadcrumb(r.label.toUpperCase());
-    d3.selectAll(".anatomy.region").classed("active", false);
-    d3.select(`[data-region="${regionId}"]`).classed("active", true);
-  }
-
-  function setBreadcrumb(text) {
-    const el = document.getElementById("breadcrumb");
-    el.textContent = text;
-    el.classList.add("show");
-  }
-  function clearBreadcrumb() {
-    document.getElementById("breadcrumb").classList.remove("show");
-    d3.selectAll(".anatomy.region").classed("active", false);
-  }
-
-  // -------------------------------------------------------------------
-  // REGION CLICKS
-  // -------------------------------------------------------------------
-  function setupRegionClicks() {
-    d3.selectAll(".anatomy.region").on("click", function(e) {
-      const id = this.getAttribute("data-region");
-      zoomToRegion(id);
-      showRegionDetail(id);
-    });
-    // Click background to clear
-    d3.select("#brain").on("click", function(e) {
-      if (e.target.tagName === "svg") {
-        clearBreadcrumb();
-        clearDetail();
+    canvas.addEventListener("pointermove", e => {
+      const hit = pickAt(e.clientX, e.clientY);
+      if (hit !== _hovered) {
+        if (_hovered) restoreNode(_hovered);
+        _hovered = hit;
+        if (_hovered) highlightNode(_hovered);
+      }
+      if (_hovered) {
+        showTipFor(_hovered, e.clientX, e.clientY);
+      } else {
+        tip.classList.remove("show");
       }
     });
-  }
 
-  function showRegionDetail(regionId) {
-    const r = REGIONS[regionId];
-    const matchingNodes = _allNodes.filter(n => n.region === regionId);
-    const grouped = {};
-    for (const n of matchingNodes) {
-      grouped[n.categoryLabel || n.group] = grouped[n.categoryLabel || n.group] || [];
-      grouped[n.categoryLabel || n.group].push(n);
-    }
-    const groupHtml = Object.entries(grouped).map(([label, items]) => `
-      <div style="margin-bottom: 10px;">
-        <div style="color: var(--cyan); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px;">${escapeHtml(label)}</div>
-        ${items.map(i => `<div style="font-size: 12.5px; padding: 2px 0; cursor: pointer;" onclick="window._selectById('${escapeHtml(i.id)}')">· ${escapeHtml(i.label)}</div>`).join("")}
-      </div>
-    `).join("");
-    const dp = document.getElementById("detail-panel");
-    dp.classList.remove("empty");
-    dp.innerHTML = `
-      <h3>${escapeHtml(r.label)}</h3>
-      <div class="title">${escapeHtml(r.label)} region</div>
-      <div class="meta">${matchingNodes.length} node${matchingNodes.length === 1 ? "" : "s"} in this region</div>
-      <div class="body">${groupHtml || "<i style='color:var(--sage)'>(empty)</i>"}</div>`;
-  }
-
-  // -------------------------------------------------------------------
-  // NODE SELECTION
-  // -------------------------------------------------------------------
-  window._selectById = (id) => {
-    const n = _allNodes.find(x => x.id === id);
-    if (n) selectNode(n);
-  };
-
-  function selectNode(n) {
-    _selected = n;
-    d3.selectAll("g.node").classed("selected", d => d.id === n.id);
-    showNodeDetail(n);
-  }
-
-  function showNodeDetail(n) {
-    const dp = document.getElementById("detail-panel");
-    dp.classList.remove("empty");
-
-    let bodyHtml = "";
-    if (n.body) {
-      bodyHtml += `<pre>${escapeHtml(n.body)}</pre>`;
-    }
-    if (n.schema) {
-      bodyHtml += `<div class="meta" style="margin-top:10px">Schema:</div>
-                   <pre>${escapeHtml(JSON.stringify(n.schema, null, 2))}</pre>`;
-    }
-    if (n.path) {
-      bodyHtml += `<div class="meta" style="margin-top:10px;color:var(--cyan)">${escapeHtml(n.path)}</div>`;
-    }
-
-    dp.innerHTML = `
-      <h3>${escapeHtml(REGIONS[n.region].label)}</h3>
-      <div class="title">${escapeHtml(n.label)}</div>
-      <div class="meta">${escapeHtml(n.categoryLabel || n.group)}</div>
-      <div class="body">${bodyHtml || "<i style='color:var(--sage)'>(no body)</i>"}</div>
-    `;
-  }
-
-  function clearDetail() {
-    _selected = null;
-    d3.selectAll("g.node").classed("selected", false);
-    const dp = document.getElementById("detail-panel");
-    dp.classList.add("empty");
-    dp.innerHTML = `<h3>Selection</h3>
-      <div class="placeholder">
-        Click a region or a node in the brain. Each region maps to a
-        functional zone — Frontal carries voice and identity, Limbic
-        holds the self-model and the relationship, Motor cortex is
-        where the tools live, Cerebellum is drift detection. Search
-        finds anything by name; pinned nodes pulse.
-      </div>`;
-  }
-
-  // -------------------------------------------------------------------
-  // SEARCH
-  // -------------------------------------------------------------------
-  function setupSearch() {
-    const input = document.getElementById("search");
-    input.addEventListener("input", (e) => {
-      const q = e.target.value.trim().toLowerCase();
-      if (!q) {
-        d3.selectAll("g.node").classed("matched", false).classed("dimmed", false);
-        return;
+    canvas.addEventListener("click", e => {
+      const hit = pickAt(e.clientX, e.clientY);
+      if (hit) {
+        selectNode(hit);
       }
-      d3.selectAll("g.node")
-        .classed("matched", d => (d.label || "").toLowerCase().includes(q))
-        .classed("dimmed",  d => !(d.label || "").toLowerCase().includes(q));
     });
-  }
 
-  // -------------------------------------------------------------------
-  // CLOSE PANEL (mobile)
-  // -------------------------------------------------------------------
-  function setupCloseButton() {
-    document.getElementById("close-panel").addEventListener("click", () => {
-      document.getElementById("panel").classList.remove("open");
-    });
-  }
+    function highlightNode(mesh) {
+      mesh.scale.setScalar(1.8);
+      mesh.material.color.setHex(0xFFD27A);
+    }
+    function restoreNode(mesh) {
+      if (mesh === _selected) return;
+      mesh.scale.setScalar(1.0);
+      mesh.material.color.setHex(mesh.userData.baseColor);
+    }
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c => ({
-      "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
-    }[c]));
-  }
+    function showTipFor(mesh, clientX, clientY) {
+      const d = mesh.userData;
+      const region = REGIONS[d.region];
+      tip.querySelector(".tip-label").textContent = d.data.label || d.data.id || "node";
+      tip.querySelector(".tip-region").textContent = region ? region.label : "";
+      const rect = viewport.getBoundingClientRect();
+      tip.style.left = (clientX - rect.left) + "px";
+      tip.style.top  = (clientY - rect.top)  + "px";
+      tip.classList.add("show");
+    }
+
+    function selectNode(mesh) {
+      if (_selected && _selected !== mesh) {
+        // Force restore the old selection regardless of _selected guard
+        const old = _selected;
+        _selected = null;
+        old.scale.setScalar(1.0);
+        old.material.color.setHex(old.userData.baseColor);
+      }
+      _selected = mesh;
+      mesh.scale.setScalar(2.2);
+      mesh.material.color.setHex(0xE6B85C);
+      renderDetail(mesh.userData);
+      // Open mobile panel
+      document.getElementById("panel").classList.add("open");
+    }
+
+    function renderDetail(d) {
+      const n = d.data;
+      const region = REGIONS[d.region];
+      const detail = document.getElementById("detail-panel");
+      detail.classList.remove("empty");
+      let bodyHTML = "";
+      if (n.body) {
+        bodyHTML = `<pre>${escapeHtml(n.body)}</pre>`;
+      } else if (n.summary) {
+        bodyHTML = `<div class="body">${escapeHtml(n.summary)}</div>`;
+      } else {
+        bodyHTML = `<div class="body" style="color:var(--sage);font-style:italic">No body text — this is an index node.</div>`;
+      }
+      const meta = [];
+      if (region) meta.push(region.label);
+      if (d.categoryLabel) meta.push(d.categoryLabel);
+      if (n.path) meta.push(n.path);
+      detail.innerHTML = `
+        <h3>Selection</h3>
+        <div class="title">${escapeHtml(n.label || n.id)}</div>
+        <div class="meta">${escapeHtml(meta.join("  ·  "))}</div>
+        ${bodyHTML}
+      `;
+    }
+
+    function escapeHtml(s) {
+      return (s || "").toString()
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    // =================================================================
+    // SEARCH — filter visible nodes
+    // =================================================================
+    function setupSearch() {
+      const input = document.getElementById("search");
+      input.addEventListener("input", () => {
+        const q = input.value.trim().toLowerCase();
+        for (const m of _allNodeMeshes) {
+          const d = m.userData.data;
+          const text = `${d.id || ""} ${d.label || ""} ${d.body || ""} ${d.summary || ""}`.toLowerCase();
+          const match = !q || text.includes(q);
+          m.visible = match;
+        }
+      });
+    }
+
+    function setupCloseButton() {
+      document.getElementById("close-panel").addEventListener("click", () => {
+        document.getElementById("panel").classList.remove("open");
+      });
+    }
+
+    // =================================================================
+    // CONTROLS — zoom buttons + auto-rotate toggle
+    // =================================================================
+    function setupControls() {
+      document.getElementById("zoom-fit").addEventListener("click", () => {
+        camera.position.set(0.0, 0.4, 7.2);
+        controls.target.set(0, 0, 0);
+        controls.update();
+      });
+      document.getElementById("zoom-in").addEventListener("click", () => {
+        camera.position.multiplyScalar(0.85);
+        controls.update();
+      });
+      document.getElementById("zoom-out").addEventListener("click", () => {
+        camera.position.multiplyScalar(1.15);
+        controls.update();
+      });
+      document.getElementById("auto-rotate").addEventListener("click", () => {
+        autoRotateOn = !autoRotateOn;
+        controls.autoRotate = autoRotateOn;
+      });
+    }
+
+    // =================================================================
+    // ANIMATION LOOP
+    // =================================================================
+    const clock = new THREE.Clock();
+    function tick() {
+      const dt = clock.getDelta();
+      // Gentle pulse on limbic core
+      const t = clock.elapsedTime;
+      const pulse = 1 + Math.sin(t * 1.4) * 0.04;
+      limbicCore.scale.setScalar(pulse);
+
+      // Subtle node bobbing — adds life
+      for (let i = 0; i < _allNodeMeshes.length; i++) {
+        const m = _allNodeMeshes[i];
+        if (m === _hovered || m === _selected) continue;
+        const phase = i * 0.17;
+        const bob = Math.sin(t * 0.6 + phase) * 0.001;
+        m.position.x += bob;
+      }
+
+      controls.update();
+      composer.render();
+      requestAnimationFrame(tick);
+    }
+
+    // Boot
+    resize();
+    tick();
   </script>
 </body>
 </html>
