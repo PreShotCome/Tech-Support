@@ -673,27 +673,21 @@
       (gltf) => {
         const realBrain = gltf.scene;
 
+        // Collect meshes first — mutating obj.children during traverse
+        // causes infinite recursion (the new child gets enumerated and
+        // we add ANOTHER child to it, ad infinitum).
+        const meshes = [];
+        realBrain.traverse((obj) => { if (obj.isMesh) meshes.push(obj); });
+
         // Re-skin every Mesh in the model with our holographic wireframe.
-        realBrain.traverse((obj) => {
-          if (obj.isMesh) {
-            obj.material = new THREE.MeshBasicMaterial({
-              color: 0xF4A23B,
-              wireframe: true,
-              transparent: true,
-              opacity: 0.6,
-            });
-            // A faint additive backside fill for volumetric feel
-            const fillMat = new THREE.MeshBasicMaterial({
-              color: 0xF4A23B,
-              transparent: true,
-              opacity: 0.04,
-              side: THREE.BackSide,
-              depthWrite: false,
-            });
-            const fillMesh = new THREE.Mesh(obj.geometry, fillMat);
-            obj.add(fillMesh);
-          }
-        });
+        for (const obj of meshes) {
+          obj.material = new THREE.MeshBasicMaterial({
+            color: 0xF4A23B,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.55,
+          });
+        }
 
         // Normalize scale + center the model so it occupies the same
         // envelope as our procedural cortex (~3.3 wide). The Sketchfab
