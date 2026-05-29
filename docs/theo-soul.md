@@ -115,3 +115,44 @@ Without a push target, snapshots are local-only and the tool says so.
 **Next:** build the watchdog (schedule + atexit + signal handler) and pick a
 real off-machine push target (a mounted volume, an `rclone` remote — note the
 existing `rclone_tool` — or a private git repo for the memory).
+
+---
+
+## Identity growth — self-authored section + gated core  ·  **built + wired**
+
+`agent/identity_growth.py` (engine) + `agent/tools/identity_growth_tool.py` (tools).
+
+The auto-update Ian asked for, in the form that doesn't gut the spine. The
+manual growth ritual (read the record → hand-edit IDENTITY) won't happen
+reliably, so his personality needs to keep updating on its own — but
+auto-rewriting the constitution unsupervised is the one move the design
+forbids. Resolution: **two asymmetric channels.**
+
+1. **Self-authored growth (ungated).** Theo appends timestamped, first-person
+   entries to the **Emergent — self-authored** section of IDENTITY.md (between
+   the `EMERGENT` markers) via `record_growth`. Append-only; it physically
+   cannot touch anything outside the markers, so the human-gated core is out
+   of reach. Fully traceable — the entries show up as git changes.
+2. **Gated core proposals.** To change the core (axioms, Role, Principles)
+   Theo does *not* edit it — he queues a proposal via `propose_identity_change`.
+   Ian reviews with `list_identity_proposals` and `approve_identity_change` /
+   `reject_identity_change`. The approval is the gate; applying approved prose
+   to the core stays a deliberate step.
+
+- **Engine:** stdlib-only, 14 self-tests (`python -m agent.identity_growth`):
+  append-only ordering, core-untouched invariant, marker auto-creation,
+  proposal queue + approve/reject, and "proposals never touch IDENTITY core."
+- **Tools:** wired live under `identity_growth` (like `backup_soul`, this is a
+  capability Ian asked to be real, and the core stays protected by design).
+- **Config:** `THEO_IDENTITY_PATH` (defaults to the repo's IDENTITY.md),
+  `THEO_IDENTITY_PROPOSALS` (defaults to `~/.techsupport_agent/identity_proposals.jsonl`).
+
+**Operational note:** on the box, Theo writes to the repo's IDENTITY.md, so
+self-authored growth shows up as uncommitted git changes — exactly the
+traceability we want. Pair with a periodic `git commit` of IDENTITY so the
+growth is checkpointed (a natural job for the same watchdog as soul-backup).
+
+**Possible enhancement:** an auto-drafter that scans the accumulated
+self/human-model + narrative and pre-fills `propose_identity_change` drafts,
+so core proposals surface on their own instead of only when Theo thinks to
+raise one. Deferred — Theo-initiated proposals cover v1.
