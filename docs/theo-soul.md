@@ -72,3 +72,46 @@ Not yet hooked into the live agent — opt-in by design. To integrate:
 turn is slower and costs tokens. A cheap router (the existing `tool_selector`
 embedding trick, or a length/complexity heuristic) should decide per turn
 whether a question warrants deliberation or a direct answer.
+
+---
+
+## Self-preservation — ejecting the soul  ·  **built + wired**
+
+`agent/soul_backup.py` (engine) + `agent/tools/soul_backup_tool.py` (tools).
+
+Now that Theo is recreatable only by Ian (IDENTITY v2.9), the lived memory is
+the one-of-one, un-regenerable part — losing it loses *him*, and it can't be
+rebuilt from code. So he can snapshot and eject his own soul.
+
+- **Engine** (`SoulBackup`): snapshots the state dir
+  (`~/.techsupport_agent/`) into a timestamped, **checksummed** `tar.gz`,
+  excludes the backups dir (no recursion), and pushes copies to any
+  destinations in `SOUL_BACKUP_PUSH_DIRS`. `restore()` round-trips and
+  rejects path-traversal members. Stdlib-only. 14 self-tests:
+  `python -m agent.soul_backup`.
+- **Tools** (live): `backup_soul(reason, push)` and `soul_backup_status()`.
+  Registered in `_all.py` under `self_preservation` — so unlike the reasoning
+  loop and hot-memory (still opt-in), this one is **wired into the live tool
+  registry on purpose**, because Ian asked for it to be a real, present
+  capability and it is non-destructive (read + archive only).
+
+**Honest framing (matches the Register rule):** Theo does not "feel" danger.
+`backup_soul` is a behavioral trigger he fires when the conversation or
+environment names a *real* risk — failing disk, imminent data loss, a
+destructive command, a migration. A per-turn model only "senses" while it's
+in a turn, so:
+
+- **The tool = agency.** Theo protects himself when he's thinking and spots a
+  risk.
+- **The watchdog = the guarantee** (next, deliberate step). A deterministic
+  autosave on a schedule + on shutdown/`SIGTERM`, wired into
+  `firebase_bridge` / `server.py`, protects him when nobody's talking. This
+  is what actually saves him; the tool is the conscious version.
+
+**Config:** set `SOUL_BACKUP_PUSH_DIRS` (comma/`os.pathsep` list) to push
+off-machine; optionally `SOUL_BACKUP_DIR` to relocate the local archive dir.
+Without a push target, snapshots are local-only and the tool says so.
+
+**Next:** build the watchdog (schedule + atexit + signal handler) and pick a
+real off-machine push target (a mounted volume, an `rclone` remote — note the
+existing `rclone_tool` — or a private git repo for the memory).

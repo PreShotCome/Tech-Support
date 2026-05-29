@@ -52,6 +52,7 @@ def _import_modules():
     from . import proteus_congress
     from . import typed_memory
     from . import theo_predict
+    from . import soul_backup_tool
     return [
         ("trading",         trading),
         ("memory",          memory),
@@ -80,6 +81,7 @@ def _import_modules():
         ("proteus_congress", proteus_congress),
         ("typed_memory",    typed_memory),
         ("theo_predict",    theo_predict),
+        ("self_preservation", soul_backup_tool),
     ]
 
 
