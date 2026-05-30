@@ -24,12 +24,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Optional
 
-from ..drift import _parse_turns, _scan_assistant_text
+from ..drift import _scan_assistant_text
 
 
 # A compact persona for the system message. Keep it short — repeating the
@@ -69,6 +70,63 @@ def _drift_hits(text: str) -> int:
     return sum(len(v) for v in _scan_assistant_text(text).values())
 
 
+# Top-level turn header: `## you · <ts>` or `## agent · <ts>`.
+_TURN_HEADER_RE = re.compile(r"^##\s+(you|agent)\s+·\s+")
+
+
+def _strip_tool_blocks(body: list[str]) -> str:
+    """Remove `### ...` tool blocks (header + fenced code block) from a turn
+    body, return the remaining prose.
+
+    drift._parse_turns cuts an agent body at the first `###`, which silently
+    drops the *final answer prose* that comes after a tool sequence. It also
+    leaves embedded tool blocks in a 'you' turn body when the transcript logger
+    forgot to emit a `## agent` header. This handles both: skip `###` headers
+    and their fenced bodies, keep everything else.
+    """
+    out: list[str] = []
+    i = 0
+    n = len(body)
+    while i < n:
+        line = body[i]
+        if line.startswith("### "):
+            i += 1
+            # Advance to opening ``` fence; bail if we hit another header.
+            while i < n and not body[i].lstrip().startswith("```"):
+                if body[i].startswith("### ") or body[i].startswith("## "):
+                    break
+                i += 1
+            if i < n and body[i].lstrip().startswith("```"):
+                i += 1  # consume opening fence
+                while i < n and not body[i].lstrip().startswith("```"):
+                    i += 1
+                if i < n:
+                    i += 1  # consume closing fence
+            continue
+        out.append(line)
+        i += 1
+    return "\n".join(out).strip()
+
+
+def _iter_turns(path: Path):
+    """Parse a transcript into (role, prose_text, line_no). Tool blocks are
+    stripped from every turn body so post-tool answer prose is preserved."""
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except Exception:
+        return
+    lines = raw.splitlines()
+    headers: list[tuple[int, str]] = []
+    for i, line in enumerate(lines):
+        m = _TURN_HEADER_RE.match(line)
+        if m:
+            headers.append((i, m.group(1)))
+    for idx, (start, role) in enumerate(headers):
+        end = headers[idx + 1][0] if idx + 1 < len(headers) else len(lines)
+        body = lines[start + 1:end]
+        yield role, _strip_tool_blocks(body), start + 1
+
+
 def build_examples(
     transcripts_dir: Path,
     system_prompt: str = _DEFAULT_SYSTEM,
@@ -89,13 +147,13 @@ def build_examples(
         stats.scanned += 1
         msgs: list[dict] = [{"role": "system", "content": system_prompt}]
         drift_hits = 0
-        for t in _parse_turns(path):
-            text = (t.text or "").strip()
+        for role, raw_text, _ln in _iter_turns(path):
+            text = (raw_text or "").strip()
             if not text:
                 continue
-            if t.role == "you":
+            if role == "you":
                 msgs.append({"role": "user", "content": text})
-            elif t.role == "agent":
+            elif role == "agent":
                 drift_hits += _drift_hits(text)
                 msgs.append({"role": "assistant", "content": text})
 
@@ -234,6 +292,96 @@ def _selftest() -> int:
         # loosening max_drift lets the drifted one back in
         _, stats2 = build_examples(tdir, max_drift=10)
         check("loosening drift keeps more", stats2.kept == 3)
+
+    # --- Tool-block recovery (the real-Theo pattern from Ian's transcripts) ---
+    with tempfile.TemporaryDirectory() as d2:
+        tdir2 = Path(d2) / "transcripts"
+        tdir2.mkdir()
+        # t5. Agent turn: lead-in prose, tool block, then final-answer prose.
+        # The original parser cut the final answer; we must recover it.
+        (tdir2 / "t5.md").write_text(
+            "## you · 2026-05-29T00:00:00Z\n"
+            "\n"
+            "What time is it?\n"
+            "\n"
+            "## agent · 2026-05-29T00:00:01Z\n"
+            "\n"
+            "One sec, let me check.\n"
+            "\n"
+            "### tool_call · now · 2026-05-29T00:00:02Z\n"
+            "\n"
+            "```\n"
+            "{}\n"
+            "```\n"
+            "\n"
+            "### tool_result · now · 2026-05-29T00:00:03Z\n"
+            "\n"
+            "```\n"
+            "2026-05-29T00:00:03Z\n"
+            "```\n"
+            "\n"
+            "Looks like 00:00:03 UTC.\n",
+            encoding="utf-8",
+        )
+        # t6. Tool blocks under a `## you` turn, NO `## agent` header
+        # (the transcript-logger pattern). Drops as too short, but the
+        # user prose must be clean of raw tool JSON.
+        (tdir2 / "t6.md").write_text(
+            "## you · 2026-05-29T00:00:00Z\n"
+            "\n"
+            "Hello\n"
+            "\n"
+            "### tool_call · get_name · 2026-05-29T00:00:01Z\n"
+            "\n"
+            "```\n"
+            "{}\n"
+            "```\n"
+            "\n"
+            "### tool_result · get_name · 2026-05-29T00:00:02Z\n"
+            "\n"
+            "```\n"
+            "{\"name\": null}\n"
+            "```\n",
+            encoding="utf-8",
+        )
+        # t7. Agent turn that is ONLY a tool block with no prose. Dropped.
+        (tdir2 / "t7.md").write_text(
+            "## you · 2026-05-29T00:00:00Z\n"
+            "\n"
+            "Hi\n"
+            "\n"
+            "## agent · 2026-05-29T00:00:01Z\n"
+            "\n"
+            "### tool_call · get_name · 2026-05-29T00:00:02Z\n"
+            "\n"
+            "```\n"
+            "{}\n"
+            "```\n",
+            encoding="utf-8",
+        )
+
+        examples_b, stats_b = build_examples(tdir2)
+
+        check("tool-block scan count", stats_b.scanned == 3)
+        check("recovered the post-tool-prose example", stats_b.kept == 1)
+        check("tool-only agent + no-agent both dropped", stats_b.dropped_short == 2)
+
+        # The kept example is t5: assistant prose must join lead-in + answer
+        # AND must NOT contain raw tool JSON / the raw timestamp from the
+        # tool_result code block.
+        t5 = examples_b[0]
+        asst = next(m for m in t5["messages"] if m["role"] == "assistant")
+        check("agent prose joins lead-in and post-tool answer",
+              "One sec" in asst["content"] and "Looks like" in asst["content"])
+        check("tool JSON stripped from agent content",
+              "{}" not in asst["content"]
+              and "2026-05-29T00:00:03Z" not in asst["content"])
+
+        # User-side stripping: t6's user message should be just "Hello",
+        # even though tool blocks were embedded under it.
+        t6_turns = list(_iter_turns(tdir2 / "t6.md"))
+        user_text = next(t for r, t, _ in t6_turns if r == "you").strip()
+        check("tool blocks stripped from user turn body", user_text == "Hello")
 
     print()
     if failures:
