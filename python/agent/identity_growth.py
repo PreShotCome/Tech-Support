@@ -199,11 +199,11 @@ def _selftest() -> int:
         em = g.read_emergent()
         check("growth entry recorded", "analogies" in em)
         check("core sentinel intact",
-              "CORE_AXIOM_SENTINEL — human-gated, must never change." in idp.read_text())
+              "CORE_AXIOM_SENTINEL — human-gated, must never change." in idp.read_text(encoding="utf-8"))
 
         # 2. Append-only ordering.
         g.append_emergent("Second thing I learned about myself.")
-        full = idp.read_text()
+        full = idp.read_text(encoding="utf-8")
         check("both entries present",
               "analogies" in full and "Second thing" in full)
         check("append order preserved",
@@ -224,10 +224,10 @@ def _selftest() -> int:
         g2 = IdentityGrowth(identity_path=bare, proposals_path=Path(d) / "p2.jsonl", clock=clock)
         g2.append_emergent("first growth on a bare file")
         check("section auto-created", "first growth" in g2.read_emergent())
-        check("bare title preserved", "# just a title" in bare.read_text())
+        check("bare title preserved", "# just a title" in bare.read_text(encoding="utf-8"))
 
         # 5. Gated proposals: queue, list, approve/reject — core never touched.
-        before = idp.read_text()
+        before = idp.read_text(encoding="utf-8")
         p1 = g.propose_core_change("Role", "tighten the peer language", "...new text...")
         p2 = g.propose_core_change("Principles", "add a clause", "...other...")
         check("proposal ids increment", (p1["id"], p2["id"]) == (1, 2))
@@ -240,7 +240,7 @@ def _selftest() -> int:
         check("proposal 2 rejected with note",
               g._all_proposals()[2]["status"] == "rejected"
               and g._all_proposals()[2].get("note") == "not yet")
-        check("proposals never touch IDENTITY core", idp.read_text() == before)
+        check("proposals never touch IDENTITY core", idp.read_text(encoding="utf-8") == before)
 
     print()
     if failures:
